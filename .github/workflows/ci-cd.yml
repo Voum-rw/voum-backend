@@ -11,6 +11,8 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
 
     services:
       postgres:
@@ -64,10 +66,10 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Registry
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && secrets.DOCKER_USERNAME != ''
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && env.DOCKER_USERNAME != ''
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
+          username: ${{ env.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and Push Docker Image
@@ -76,7 +78,7 @@ jobs:
         with:
           context: ./voum-backend
           file: ./voum-backend/Dockerfile
-          push: ${{ secrets.DOCKER_USERNAME != '' }}
+          push: ${{ env.DOCKER_USERNAME != '' }}
           tags: |
             voum/backend:latest
             voum/backend:${{ github.sha }}
