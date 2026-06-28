@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: voum-backend
+  profiles:
+    active: local
+
+server:
+  port: 8080
+  error:
+    include-message: always
+    include-binding-errors: always
