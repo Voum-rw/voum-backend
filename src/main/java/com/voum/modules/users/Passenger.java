@@ -42,6 +42,10 @@ public class Passenger {
     private String profileImage;
 
     @Builder.Default
+    @Column(name = "onboarding_status", nullable = false)
+    private String onboardingStatus = "IN_PROGRESS"; // IN_PROGRESS, COMPLETED
+
+    @Builder.Default
     @Column(nullable = false)
     private String status = "ACTIVE";
 

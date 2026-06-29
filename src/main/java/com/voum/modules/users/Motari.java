@@ -51,7 +51,14 @@ public class Motari {
 
     @Builder.Default
     @Column(name = "verification_status", nullable = false)
-    private String verificationStatus = "PENDING"; // PENDING, APPROVED, REJECTED
+    private String verificationStatus = "PENDING"; // PENDING, UNDER_REVIEW, APPROVED, REJECTED, SUSPENDED
+
+    @Builder.Default
+    @Column(name = "onboarding_status", nullable = false)
+    private String onboardingStatus = "IN_PROGRESS"; // IN_PROGRESS, COMPLETED
+
+    @Column(name = "verification_request_id")
+    private UUID verificationRequestId;
 
     @Builder.Default
     @Column(nullable = false)

@@ -47,6 +47,10 @@ public class User {
 
     @Builder.Default
     @Column(nullable = false)
+    private String status = "INACTIVE"; // ACTIVE, INACTIVE, BLOCKED, PENDING_VERIFICATION
+
+    @Builder.Default
+    @Column(nullable = false)
     private Double rating = 5.0;
 
     @Builder.Default
