@@ -6,12 +6,17 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.Where;
 
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
 @Table(name = "users")
+@SQLDelete(sql = "UPDATE users SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?")
+@Where(clause = "deleted_at IS NULL")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -54,11 +59,11 @@ public class User {
 
     @Builder.Default
     @Column(name = "current_lat", nullable = false)
-    private Double currentLat = -1.9441; // Default Kigali Center
+    private Double currentLat = -1.9441; // Kigali Center
 
     @Builder.Default
     @Column(name = "current_lng", nullable = false)
-    private Double currentLng = 30.0619; // Default Kigali Center
+    private Double currentLng = 30.0619; // Kigali Center
 
     @Builder.Default
     @Column(name = "is_verified", nullable = false)
@@ -75,4 +80,11 @@ public class User {
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
 }
