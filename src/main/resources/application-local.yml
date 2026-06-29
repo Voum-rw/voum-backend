@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/voum_db}
-    username: ${SPRING_DATASOURCE_USERNAME:voum_user}
-    password: ${SPRING_DATASOURCE_PASSWORD:voum_pass}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:voum_db}
+    username: ${DB_USERNAME:voum_user}
+    password: ${DB_PASSWORD:voum_pass}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
