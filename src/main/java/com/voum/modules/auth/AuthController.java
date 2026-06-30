@@ -19,7 +19,7 @@ public class AuthController {
 
     @PostMapping("/otp/send")
     public ResponseEntity<ApiResponse<Void>> sendOtp(@Valid @RequestBody SendOtpRequest req) {
-        authService.sendOtp(req.getPhone());
+        authService.sendOtp(req.getEmail());
         return ResponseEntity.ok(ApiResponse.success(null, "OTP sent successfully."));
     }
 

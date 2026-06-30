@@ -26,12 +26,15 @@ public class UserLocation {
     @Column(name = "user_id", unique = true, nullable = false)
     private UUID userId;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.DECIMAL)
     @Column(name = "latitude")
     private Double latitude;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.DECIMAL)
     @Column(name = "longitude")
     private Double longitude;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.DECIMAL)
     @Column(name = "accuracy")
     private Double accuracy;
 

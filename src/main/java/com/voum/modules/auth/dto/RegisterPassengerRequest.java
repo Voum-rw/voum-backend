@@ -11,6 +11,10 @@ public class RegisterPassengerRequest {
     @Pattern(regexp = "^\\+?[1-9]\\d{1,14}$", message = "Invalid phone number format")
     private String phone;
 
+    @NotBlank(message = "Email is required")
+    @Email(message = "Invalid email format")
+    private String email;
+
     @NotBlank(message = "OTP code is required")
     @Pattern(regexp = "^\\d{6}$", message = "OTP must be a 6-digit number")
     private String code;
@@ -20,7 +24,4 @@ public class RegisterPassengerRequest {
 
     @NotBlank(message = "Last name is required")
     private String lastName;
-
-    @Email(message = "Invalid email format")
-    private String email;
 }

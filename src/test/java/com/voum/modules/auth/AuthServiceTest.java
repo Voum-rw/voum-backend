@@ -59,12 +59,12 @@ class AuthServiceTest {
 
     @Test
     void sendOtp_shouldStoreInRedis() {
-        String phone = "+250780000000";
+        String email = "test@voum.com";
         
-        authService.sendOtp(phone);
+        authService.sendOtp(email);
         
         verify(valueOperations, times(1)).set(
-                eq("otp:" + phone),
+                eq("otp:" + email),
                 anyString(),
                 eq(5L),
                 eq(TimeUnit.MINUTES)
@@ -74,19 +74,20 @@ class AuthServiceTest {
     @Test
     void registerPassenger_shouldCreateUserAndProfile() {
         String phone = "+250780000000";
+        String email = "john@voum.rw";
         String code = "123456";
         
         RegisterPassengerRequest req = new RegisterPassengerRequest();
         req.setPhone(phone);
+        req.setEmail(email);
         req.setCode(code);
         req.setFirstName("John");
         req.setLastName("Doe");
-        req.setEmail("john@voum.rw");
 
         // Mock OTP check
-        when(valueOperations.get("otp:" + phone)).thenReturn(code);
+        when(valueOperations.get("otp:" + email)).thenReturn(code);
         when(userRepository.existsByPhone(phone)).thenReturn(false);
-        when(userRepository.existsByEmail(req.getEmail())).thenReturn(false);
+        when(userRepository.existsByEmail(email)).thenReturn(false);
 
         // Mock User Save
         UUID generatedId = UUID.randomUUID();
@@ -94,7 +95,7 @@ class AuthServiceTest {
                 .id(generatedId)
                 .name("John Doe")
                 .phone(phone)
-                .email(req.getEmail())
+                .email(email)
                 .role(Role.PASSENGER)
                 .build();
         when(userRepository.save(any(User.class))).thenReturn(savedUser);
@@ -119,13 +120,15 @@ class AuthServiceTest {
     @Test
     void registerPassenger_withDuplicatePhone_shouldThrowApiException() {
         String phone = "+250780000000";
+        String email = "john@voum.rw";
         String code = "123456";
         
         RegisterPassengerRequest req = new RegisterPassengerRequest();
         req.setPhone(phone);
+        req.setEmail(email);
         req.setCode(code);
 
-        when(valueOperations.get("otp:" + phone)).thenReturn(code);
+        when(valueOperations.get("otp:" + email)).thenReturn(code);
         when(userRepository.existsByPhone(phone)).thenReturn(true);
 
         ApiException exception = assertThrows(ApiException.class, () -> authService.registerPassenger(req));

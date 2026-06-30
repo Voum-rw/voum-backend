@@ -27,18 +27,22 @@ public class RideRequest {
     private UUID passengerId;
 
     @NotNull
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.DECIMAL)
     @Column(name = "pickup_latitude")
     private Double pickupLatitude;
 
     @NotNull
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.DECIMAL)
     @Column(name = "pickup_longitude")
     private Double pickupLongitude;
 
     @NotNull
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.DECIMAL)
     @Column(name = "destination_latitude")
     private Double destinationLatitude;
 
     @NotNull
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.DECIMAL)
     @Column(name = "destination_longitude")
     private Double destinationLongitude;
 
@@ -49,6 +53,7 @@ public class RideRequest {
     private String destinationAddress;
 
     @NotNull
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.DECIMAL)
     @Column(name = "proposed_budget")
     private Double proposedBudget;
 
@@ -72,6 +77,7 @@ public class RideRequest {
     private Integer requestVersion = 1;
 
     @Builder.Default
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.DECIMAL)
     @Column(name = "visibility_radius_km", nullable = false)
     private Double visibilityRadiusKm = 3.00;
 

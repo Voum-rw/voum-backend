@@ -30,6 +30,7 @@ public class RideOffer {
     private UUID motariId;
 
     @NotNull
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.DECIMAL)
     @Column(name = "offered_price", nullable = false)
     private Double offeredPrice;
 
