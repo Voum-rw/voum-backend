@@ -27,19 +27,19 @@ public class RideRequest {
     private UUID passengerId;
 
     @NotNull
-    @Column(name = "pickup_latitude", precision = 10, scale = 8)
+    @Column(name = "pickup_latitude")
     private Double pickupLatitude;
 
     @NotNull
-    @Column(name = "pickup_longitude", precision = 11, scale = 8)
+    @Column(name = "pickup_longitude")
     private Double pickupLongitude;
 
     @NotNull
-    @Column(name = "destination_latitude", precision = 10, scale = 8)
+    @Column(name = "destination_latitude")
     private Double destinationLatitude;
 
     @NotNull
-    @Column(name = "destination_longitude", precision = 11, scale = 8)
+    @Column(name = "destination_longitude")
     private Double destinationLongitude;
 
     @Column(name = "pickup_address")
@@ -49,7 +49,7 @@ public class RideRequest {
     private String destinationAddress;
 
     @NotNull
-    @Column(name = "proposed_budget", precision = 12, scale = 2)
+    @Column(name = "proposed_budget")
     private Double proposedBudget;
 
     @Builder.Default
@@ -72,7 +72,7 @@ public class RideRequest {
     private Integer requestVersion = 1;
 
     @Builder.Default
-    @Column(name = "visibility_radius_km", precision = 5, scale = 2, nullable = false)
+    @Column(name = "visibility_radius_km", nullable = false)
     private Double visibilityRadiusKm = 3.00;
 
     @Column(name = "created_area")

@@ -26,13 +26,13 @@ public class UserLocation {
     @Column(name = "user_id", unique = true, nullable = false)
     private UUID userId;
 
-    @Column(precision = 10, scale = 8)
+    @Column(name = "latitude")
     private Double latitude;
 
-    @Column(precision = 11, scale = 8)
+    @Column(name = "longitude")
     private Double longitude;
 
-    @Column(precision = 10, scale = 2)
+    @Column(name = "accuracy")
     private Double accuracy;
 
     @Builder.Default

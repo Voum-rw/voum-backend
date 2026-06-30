@@ -30,7 +30,7 @@ public class RideOffer {
     private UUID motariId;
 
     @NotNull
-    @Column(name = "offered_price", precision = 12, scale = 2, nullable = false)
+    @Column(name = "offered_price", nullable = false)
     private Double offeredPrice;
 
     @NotNull
