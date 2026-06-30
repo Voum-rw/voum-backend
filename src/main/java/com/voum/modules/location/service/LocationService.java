@@ -90,6 +90,23 @@ public class LocationService {
     }
 
     @Transactional
+    public void updateAvailabilityStatus(UUID userId, String status) {
+        log.info("Updating availability status for user {} to {}", userId, status);
+        UserLocation location = userLocationRepository.findByUserId(userId)
+                .orElseThrow(() -> new ApiException("Location registry not found.", HttpStatus.NOT_FOUND));
+
+        location.setAvailabilityStatus(status);
+        location.setLastSeenAt(Instant.now());
+        userLocationRepository.save(location);
+
+        if ("ONLINE".equals(status)) {
+            cacheService.cacheOnlineMotari(userId);
+        } else {
+            cacheService.evictOnlineMotari(userId);
+        }
+    }
+
+    @Transactional
     public void updateLocation(UUID userId, LocationUpdateRequest req) {
         log.debug("Updating coordinates for user: {}", userId);
 
