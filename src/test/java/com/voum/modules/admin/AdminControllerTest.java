@@ -39,12 +39,15 @@ public class AdminControllerTest {
     @Mock
     private AuditLogService auditLogService;
 
+    @Mock
+    private com.voum.modules.onboarding.OnboardingService onboardingService;
+
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
 
     @BeforeEach
     public void setUp() {
-        AdminController adminController = new AdminController(adminService, auditLogService);
+        AdminController adminController = new AdminController(adminService, auditLogService, onboardingService);
         mockMvc = MockMvcBuilders.standaloneSetup(adminController).build();
         objectMapper = new ObjectMapper();
     }

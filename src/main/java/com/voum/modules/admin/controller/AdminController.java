@@ -30,6 +30,7 @@ public class AdminController {
 
     private final AdminService adminService;
     private final AuditLogService auditLogService;
+    private final com.voum.modules.onboarding.OnboardingService onboardingService;
 
     @GetMapping("/dashboard")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
@@ -194,5 +195,36 @@ public class AdminController {
     ) {
         Page<AuditLog> response = auditLogService.getAuditLogs(page, size);
         return ResponseEntity.ok(ApiResponse.success(response, "Audit logs page retrieved successfully."));
+    }
+
+    @PostMapping("/verifications/{id}/approve")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> approveVerification(
+            @PathVariable("id") UUID requestId,
+            @AuthenticationPrincipal UUID adminId,
+            @Valid @RequestBody com.voum.modules.onboarding.dto.AdminVerifyRequest req
+    ) {
+        onboardingService.approveVerification(requestId, adminId, req);
+        // Write audit log
+        auditLogService.logAction(adminId, "APPROVE_VERIFICATION", requestId.toString(), "VERIFICATION_REQUEST", Map.of(
+                "notes", req.getAdminNotes() != null ? req.getAdminNotes() : ""
+        ));
+        return ResponseEntity.ok(ApiResponse.success(null, "Motari profile approved successfully."));
+    }
+
+    @PostMapping("/verifications/{id}/reject")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> rejectVerification(
+            @PathVariable("id") UUID requestId,
+            @AuthenticationPrincipal UUID adminId,
+            @Valid @RequestBody com.voum.modules.onboarding.dto.AdminVerifyRequest req
+    ) {
+        onboardingService.rejectVerification(requestId, adminId, req);
+        // Write audit log
+        auditLogService.logAction(adminId, "REJECT_VERIFICATION", requestId.toString(), "VERIFICATION_REQUEST", Map.of(
+                "reason", req.getRejectionReason() != null ? req.getRejectionReason() : "",
+                "notes", req.getAdminNotes() != null ? req.getAdminNotes() : ""
+        ));
+        return ResponseEntity.ok(ApiResponse.success(null, "Motari profile verification rejected."));
     }
 }
