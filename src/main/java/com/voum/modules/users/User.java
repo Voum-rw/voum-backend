@@ -81,6 +81,26 @@ public class User {
     @Column(name = "subscription_plan", nullable = false)
     private String subscriptionPlan = "Free";
 
+    @Column(name = "suspension_reason")
+    private String suspensionReason;
+
+    @Column(name = "suspended_at")
+    private Instant suspendedAt;
+
+    @Column(name = "suspended_by")
+    private UUID suspendedBy;
+
+    @Column(name = "deleted_by")
+    private UUID deletedBy;
+
+    @Builder.Default
+    @Column(name = "flag_count", nullable = false)
+    private Integer flagCount = 0;
+
+    @Builder.Default
+    @Column(name = "is_flagged", nullable = false)
+    private Boolean isFlagged = false;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -92,3 +112,4 @@ public class User {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 }
+

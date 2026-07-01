@@ -29,5 +29,23 @@ public interface TripRepository extends JpaRepository<Trip, UUID> {
 
     @Query("SELECT COUNT(t) FROM Trip t WHERE t.passengerId = :passengerId AND (t.status = 'COMPLETED' OR t.status = 'CANCELLED')")
     long countTerminalTripsForPassenger(@Param("passengerId") UUID passengerId);
+
+    long countByCreatedAtAfter(java.time.Instant time);
+    long countByStatus(String status);
+    long countByStatusAndCreatedAtAfter(String status, java.time.Instant time);
+
+    @Query("SELECT t FROM Trip t WHERE " +
+           "(:status IS NULL OR t.status = :status) AND " +
+           "(:phone IS NULL OR " +
+           " t.passengerId IN (SELECT u.id FROM User u WHERE u.phone LIKE %:phone%) OR " +
+           " t.motariId IN (SELECT u.id FROM User u WHERE u.phone LIKE %:phone%))")
+    org.springframework.data.domain.Page<Trip> findAllFiltered(
+            @Param("status") String status,
+            @Param("phone") String phone,
+            org.springframework.data.domain.Pageable pageable);
+
+    long countByStartedAtIsNotNull();
 }
+
+
 

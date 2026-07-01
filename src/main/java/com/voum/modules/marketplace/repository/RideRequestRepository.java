@@ -32,4 +32,22 @@ public interface RideRequestRepository extends JpaRepository<RideRequest, UUID> 
             @Param("maxLng") Double maxLng,
             @Param("now") Instant now
     );
+
+    long countByStatus(String status);
+    long countByStatusAndExpiresAtAfter(String status, Instant time);
+    long countByCreatedAtAfter(Instant time);
+
+    @Query("SELECT COUNT(r) FROM RideRequest r WHERE r.status = 'OPEN' AND r.expiresAt > :now")
+    long countActiveOpenRequests(@Param("now") Instant now);
+
+    @Query("SELECT r FROM RideRequest r WHERE r.status = 'OPEN' AND r.expiresAt > :now ORDER BY r.createdAt DESC")
+    org.springframework.data.domain.Page<RideRequest> findActiveOpenRequestsPage(@Param("now") Instant now, org.springframework.data.domain.Pageable pageable);
+
+    @Query("SELECT COUNT(r) FROM RideRequest r WHERE r.offersCount > 0")
+    long countRequestsWithOffers();
+
+    @Query("SELECT COUNT(r) FROM RideRequest r WHERE r.status = 'MATCHED' OR r.selectedOfferId IS NOT NULL")
+    long countRequestsAccepted();
 }
+
+

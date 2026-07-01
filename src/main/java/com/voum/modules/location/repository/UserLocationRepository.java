@@ -33,4 +33,8 @@ public interface UserLocationRepository extends JpaRepository<UserLocation, UUID
     @Query("UPDATE UserLocation u SET u.availabilityStatus = 'OFFLINE' " +
            "WHERE u.availabilityStatus IN ('ONLINE', 'BUSY') AND u.lastSeenAt < :cutoff")
     int markStaleUsersOffline(@Param("cutoff") Instant cutoff);
+
+    long countByAvailabilityStatus(String status);
+    long countByAvailabilityStatusIn(java.util.List<String> statuses);
 }
+

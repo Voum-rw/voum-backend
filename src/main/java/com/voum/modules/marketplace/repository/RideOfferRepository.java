@@ -23,5 +23,12 @@ public interface RideOfferRepository extends JpaRepository<RideOffer, UUID> {
 
     long countByMotariId(UUID motariId);
     long countByMotariIdAndStatus(UUID motariId, String status);
+
+    long countByCreatedAtAfter(java.time.Instant time);
+    long countByStatus(String status);
+
+    @org.springframework.data.jpa.repository.Query(value = "SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (o.created_at - r.created_at))), 0.0) FROM ride_offers o JOIN ride_requests r ON o.ride_request_id = r.id", nativeQuery = true)
+    Double getAverageResponseTimeSeconds();
 }
+
 
