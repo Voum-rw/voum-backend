@@ -75,6 +75,8 @@ public class RideRequestService {
                 .status("OPEN")
                 .offersCount(0)
                 .requestVersion(1)
+                .createdAt(now)   // set explicitly so it's available on the returned entity immediately
+                .updatedAt(now)
                 .build();
 
         request = rideRequestRepository.save(request);
@@ -84,6 +86,7 @@ public class RideRequestService {
 
         return marketplaceMapper.toRequestResponse(request);
     }
+
 
     @Transactional(readOnly = true)
     public RideRequestResponse getRequest(UUID id) {

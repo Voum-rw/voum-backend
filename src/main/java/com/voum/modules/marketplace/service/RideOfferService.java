@@ -79,6 +79,7 @@ public class RideOfferService {
             throw new ApiException("You have already submitted an active offer for this request. Please update your existing offer instead.", HttpStatus.BAD_REQUEST);
         }
 
+        Instant now = Instant.now();
         RideOffer offer = RideOffer.builder()
                 .rideRequestId(req.getRideRequestId())
                 .motariId(motariId)
@@ -86,6 +87,7 @@ public class RideOfferService {
                 .estimatedArrivalMinutes(req.getEstimatedArrivalMinutes())
                 .status("PENDING")
                 .updateCount(0)
+                .createdAt(now)   // set explicitly so it's available on the returned entity immediately
                 .build();
 
         offer = rideOfferRepository.save(offer);
