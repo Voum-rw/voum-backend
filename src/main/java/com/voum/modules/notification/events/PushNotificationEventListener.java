@@ -7,6 +7,7 @@ import com.voum.modules.onboarding.events.AccountApprovedEvent;
 import com.voum.modules.onboarding.events.AccountRejectedEvent;
 import com.voum.modules.review.events.*;
 import com.voum.modules.trip.events.*;
+import com.voum.modules.support.events.*;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -250,6 +251,53 @@ public class PushNotificationEventListener {
             Map<String, String> data = new HashMap<>();
             data.put("trustScore", String.format("%.2f", event.getNewScore()));
             pushNotificationService.sendPush(event.getMotariId(), NotificationTemplate.TRUST_SCORE_UPDATED, data);
+        }
+    }
+
+    // ── Support & Dispute Events ─────────────────────────────────────────────
+
+    @Async
+    @EventListener
+    public void onSupportTicketCreated(SupportTicketCreatedEvent event) {
+        Map<String, String> data = new HashMap<>();
+        data.put("ticketId", event.getTicket().getId().toString());
+        data.put("type", event.getTicket().getType().name());
+        pushNotificationService.sendPush(event.getTicket().getUserId(), NotificationTemplate.SUPPORT_TICKET_CREATED, data);
+    }
+
+    @Async
+    @EventListener
+    public void onSupportTicketAssigned(SupportTicketAssignedEvent event) {
+        Map<String, String> data = new HashMap<>();
+        data.put("ticketId", event.getTicket().getId().toString());
+        pushNotificationService.sendPush(event.getTicket().getUserId(), NotificationTemplate.SUPPORT_REPLY_RECEIVED, data);
+    }
+
+    @Async
+    @EventListener
+    public void onSupportTicketClosed(SupportTicketClosedEvent event) {
+        Map<String, String> data = new HashMap<>();
+        data.put("ticketId", event.getTicket().getId().toString());
+        pushNotificationService.sendPush(event.getTicket().getUserId(), NotificationTemplate.SUPPORT_TICKET_CLOSED, data);
+    }
+
+    @Async
+    @EventListener
+    public void onUserReported(UserReportedEvent event) {
+        if (event.getReport().getReporterId() != null) {
+            Map<String, String> data = new HashMap<>();
+            data.put("reportId", event.getReport().getId().toString());
+            pushNotificationService.sendPush(event.getReport().getReporterId(), NotificationTemplate.REPORT_RECEIVED, data);
+        }
+    }
+
+    @Async
+    @EventListener
+    public void onLostItemCreated(LostItemCreatedEvent event) {
+        if (event.getLostItem().getReportedBy() != null) {
+            Map<String, String> data = new HashMap<>();
+            data.put("lostItemId", event.getLostItem().getId().toString());
+            pushNotificationService.sendPush(event.getLostItem().getReportedBy(), NotificationTemplate.LOST_ITEM_UPDATED, data);
         }
     }
 }

@@ -50,4 +50,9 @@ public class AdminUserDetailsResponse {
     private Double motariAcceptanceRate;
     private Double motariCancellationRate;
     private Double motariTrustScore;
+
+    // User support history
+    private java.util.List<com.voum.modules.support.entity.SupportTicket> pastTickets;
+    private java.util.List<com.voum.modules.support.entity.UserReport> pastReports;
+    private java.util.List<com.voum.modules.support.entity.UserReport> pastDisputes;
 }

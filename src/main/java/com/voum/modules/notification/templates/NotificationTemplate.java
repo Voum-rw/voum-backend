@@ -75,6 +75,28 @@ public enum NotificationTemplate {
     TRUST_SCORE_UPDATED(
             "Trust Score Updated",
             "Your driver trust score has been updated."
+    ),
+
+    // ── Support, Disputes & Safety ───────────────────────────────────────────
+    SUPPORT_TICKET_CREATED(
+            "Support Ticket Created",
+            "Your support ticket has been received. Our team will review it shortly."
+    ),
+    SUPPORT_REPLY_RECEIVED(
+            "Support Reply Received",
+            "You received a reply on your support ticket."
+    ),
+    SUPPORT_TICKET_CLOSED(
+            "Support Ticket Closed",
+            "Your support ticket has been marked as closed."
+    ),
+    REPORT_RECEIVED(
+            "Report Logged",
+            "We have received a report regarding a safety or behavior concern."
+    ),
+    LOST_ITEM_UPDATED(
+            "Lost Item Report Update",
+            "There has been an update regarding your reported lost item."
     );
 
 

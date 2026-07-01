@@ -22,4 +22,13 @@ public class AdminDashboardResponse {
     private long rejectedTodayCount;
     private double approvalRate;
     private double averageVerificationTimeSeconds;
+
+    // Safety, Disputes & Support Center metrics
+    private long openTickets;
+    private long resolvedTickets;
+    private double averageFirstResponseTimeSeconds;
+    private double averageResolutionTimeSeconds;
+    private long safetyIncidentsCount;
+    private long activeReportsCount;
+    private long lostItemReportsCount;
 }

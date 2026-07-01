@@ -87,6 +87,15 @@ public class AdminServiceTest {
     private StringRedisTemplate redisTemplate;
 
     @Mock
+    private com.voum.modules.support.repository.SupportTicketRepository supportTicketRepository;
+
+    @Mock
+    private com.voum.modules.support.repository.UserReportRepository userReportRepository;
+
+    @Mock
+    private com.voum.modules.support.repository.LostItemRepository lostItemRepository;
+
+    @Mock
     private RedisConnectionFactory redisConnectionFactory;
 
     @Mock
@@ -118,7 +127,10 @@ public class AdminServiceTest {
                 tripReviewRepository,
                 auditLogService,
                 adminNoteRepository,
-                redisTemplate
+                redisTemplate,
+                supportTicketRepository,
+                userReportRepository,
+                lostItemRepository
         );
     }
 

@@ -54,6 +54,9 @@ public class AdminService {
     private final AuditLogService auditLogService;
     private final AdminNoteRepository adminNoteRepository;
     private final StringRedisTemplate redisTemplate;
+    private final com.voum.modules.support.repository.SupportTicketRepository supportTicketRepository;
+    private final com.voum.modules.support.repository.UserReportRepository userReportRepository;
+    private final com.voum.modules.support.repository.LostItemRepository lostItemRepository;
 
     @Transactional(readOnly = true)
     public AdminDashboardResponse getDashboard() {
@@ -79,6 +82,26 @@ public class AdminService {
         double approvalRate = totalProcessedToday > 0 ? ((double) approvedToday / totalProcessedToday) * 100.0 : 100.0;
         double averageVerificationTime = verificationRequestRepository.getAverageVerificationTimeSeconds();
 
+        // Safety, Disputes & Support Center Metrics
+        long openTickets = supportTicketRepository.countByStatus(com.voum.modules.support.entity.SupportTicket.TicketStatus.OPEN)
+                + supportTicketRepository.countByStatus(com.voum.modules.support.entity.SupportTicket.TicketStatus.ASSIGNED)
+                + supportTicketRepository.countByStatus(com.voum.modules.support.entity.SupportTicket.TicketStatus.REOPENED);
+        long resolvedTickets = supportTicketRepository.countByStatus(com.voum.modules.support.entity.SupportTicket.TicketStatus.RESOLVED)
+                + supportTicketRepository.countByStatus(com.voum.modules.support.entity.SupportTicket.TicketStatus.CLOSED);
+
+        Double avgFirstResponse = supportTicketRepository.getAverageFirstResponseTimeSeconds();
+        Double avgResolution = supportTicketRepository.getAverageResolutionTimeSeconds();
+
+        long safetyIncidents = supportTicketRepository.countByType(com.voum.modules.support.entity.SupportTicket.TicketType.SAFETY_EMERGENCY);
+        long activeReports = userReportRepository.countByStatus(com.voum.modules.support.entity.UserReport.ReportStatus.PENDING);
+        // UserReport doesn't have INVESTIGATING status, let's check:
+        // Wait! In UserReport.java, we defined: PENDING, INVESTIGATING, RESOLVED.
+        // Yes, we did! Let's count both PENDING and INVESTIGATING.
+        activeReports += userReportRepository.countByStatus(com.voum.modules.support.entity.UserReport.ReportStatus.INVESTIGATING);
+
+        long lostItemReports = lostItemRepository.countByStatus(com.voum.modules.support.entity.LostItem.LostItemStatus.REPORTED)
+                + lostItemRepository.countByStatus(com.voum.modules.support.entity.LostItem.LostItemStatus.FOUND);
+
         return AdminDashboardResponse.builder()
                 .totalPassengers(passengers)
                 .totalMotaris(motaris)
@@ -93,6 +116,13 @@ public class AdminService {
                 .rejectedTodayCount(rejectedToday)
                 .approvalRate(approvalRate)
                 .averageVerificationTimeSeconds(averageVerificationTime)
+                .openTickets(openTickets)
+                .resolvedTickets(resolvedTickets)
+                .averageFirstResponseTimeSeconds(avgFirstResponse != null ? avgFirstResponse : 0.0)
+                .averageResolutionTimeSeconds(avgResolution != null ? avgResolution : 0.0)
+                .safetyIncidentsCount(safetyIncidents)
+                .activeReportsCount(activeReports)
+                .lostItemReportsCount(lostItemReports)
                 .build();
     }
 
@@ -127,7 +157,10 @@ public class AdminService {
                 .flagCount(user.getFlagCount())
                 .isFlagged(user.getIsFlagged())
                 .createdAt(user.getCreatedAt())
-                .updatedAt(user.getUpdatedAt());
+                .updatedAt(user.getUpdatedAt())
+                .pastTickets(supportTicketRepository.findByUserIdOrderByCreatedAtDesc(userId))
+                .pastReports(userReportRepository.findByReportedUserIdOrderByCreatedAtDesc(userId))
+                .pastDisputes(userReportRepository.findByReporterIdOrderByCreatedAtDesc(userId));
 
         if (user.getRole() == Role.PASSENGER) {
             passengerRepository.findById(userId).ifPresent(p -> {
