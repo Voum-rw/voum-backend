@@ -37,8 +37,8 @@ public interface TripRepository extends JpaRepository<Trip, UUID> {
     @Query("SELECT t FROM Trip t WHERE " +
            "(:status IS NULL OR t.status = :status) AND " +
            "(:phone IS NULL OR " +
-           " t.passengerId IN (SELECT u.id FROM User u WHERE u.phone LIKE %:phone%) OR " +
-           " t.motariId IN (SELECT u.id FROM User u WHERE u.phone LIKE %:phone%))")
+           " t.passengerId IN (SELECT u.id FROM User u WHERE u.phone LIKE CONCAT('%', :phone, '%')) OR " +
+           " t.motariId IN (SELECT u.id FROM User u WHERE u.phone LIKE CONCAT('%', :phone, '%')))")
     org.springframework.data.domain.Page<Trip> findAllFiltered(
             @Param("status") String status,
             @Param("phone") String phone,
@@ -46,6 +46,7 @@ public interface TripRepository extends JpaRepository<Trip, UUID> {
 
     long countByStartedAtIsNotNull();
 }
+
 
 
 

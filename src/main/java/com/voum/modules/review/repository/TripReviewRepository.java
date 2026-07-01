@@ -28,8 +28,9 @@ public interface TripReviewRepository extends JpaRepository<TripReview, UUID> {
 
     @Query("SELECT r FROM TripReview r WHERE " +
            "(:phone IS NULL OR " +
-           " r.reviewerId IN (SELECT u.id FROM User u WHERE u.phone LIKE %:phone%) OR " +
-           " r.reviewedUserId IN (SELECT u.id FROM User u WHERE u.phone LIKE %:phone%)) ORDER BY r.createdAt DESC")
+           " r.reviewerId IN (SELECT u.id FROM User u WHERE u.phone LIKE CONCAT('%', :phone, '%')) OR " +
+           " r.reviewedUserId IN (SELECT u.id FROM User u WHERE u.phone LIKE CONCAT('%', :phone, '%')))")
     Page<TripReview> findAllFiltered(@Param("phone") String phone, Pageable pageable);
 }
+
 
