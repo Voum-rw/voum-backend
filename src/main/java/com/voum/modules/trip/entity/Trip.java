@@ -64,12 +64,14 @@ public class Trip {
     private String destinationAddress;
 
     @NotNull
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.DECIMAL)
     @Column(name = "agreed_price", nullable = false)
     private Double agreedPrice;
 
     @Column(name = "estimated_arrival_minutes")
     private Integer estimatedArrivalMinutes;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.DECIMAL)
     @Column(name = "estimated_distance_km")
     private Double estimatedDistanceKm;
 
