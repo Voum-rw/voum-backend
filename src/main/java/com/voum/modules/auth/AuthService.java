@@ -92,23 +92,34 @@ public class AuthService {
     public TokenResponse registerPassenger(RegisterPassengerRequest req) {
         verifyOtp(req.getEmail(), req.getCode());
 
-        if (userRepository.existsByPhone(req.getPhone())) {
-            throw new ApiException("Phone number is already registered.", HttpStatus.CONFLICT);
-        }
-        if (req.getEmail() != null && !req.getEmail().trim().isEmpty() && userRepository.existsByEmail(req.getEmail())) {
-            throw new ApiException("Email is already registered.", HttpStatus.CONFLICT);
-        }
+        // Check if a fully-registered passenger already exists with this email.
+        // We look up the User first; if it exists but has no Passenger profile yet
+        // (orphan from a prior failed transaction), we reuse it rather than conflicting.
+        User user = userRepository.findByEmail(req.getEmail()).orElse(null);
 
-        // Create User account
-        User user = User.builder()
-                .name(req.getFirstName() + " " + req.getLastName())
-                .phone(req.getPhone())
-                .email(req.getEmail())
-                .role(Role.PASSENGER)
-                .isVerified(true) // Passengers are auto-verified
-                .build();
+        if (user != null) {
+            // User row exists — check if the Passenger profile was also created.
+            if (passengerRepository.existsById(user.getId())) {
+                throw new ApiException("Email is already registered.", HttpStatus.CONFLICT);
+            }
+            // Orphaned user — profile was never created. Reuse the existing user row.
+            log.warn("Orphaned User detected for email '{}'. Completing passenger registration.", req.getEmail());
+        } else {
+            // Fresh registration — ensure phone is unique before creating a new User.
+            if (userRepository.existsByPhone(req.getPhone())) {
+                throw new ApiException("Phone number is already registered.", HttpStatus.CONFLICT);
+            }
 
-        user = userRepository.save(user);
+            user = User.builder()
+                    .name(req.getFirstName() + " " + req.getLastName())
+                    .phone(req.getPhone())
+                    .email(req.getEmail())
+                    .role(Role.PASSENGER)
+                    .isVerified(true) // Passengers are auto-verified
+                    .build();
+
+            user = userRepository.save(user);
+        }
 
         // Create Passenger Profile
         Passenger passenger = Passenger.builder()
@@ -129,12 +140,6 @@ public class AuthService {
     public TokenResponse registerMotari(RegisterMotariRequest req) {
         verifyOtp(req.getEmail(), req.getCode());
 
-        if (userRepository.existsByPhone(req.getPhone())) {
-            throw new ApiException("Phone number is already registered.", HttpStatus.CONFLICT);
-        }
-        if (req.getEmail() != null && !req.getEmail().trim().isEmpty() && userRepository.existsByEmail(req.getEmail())) {
-            throw new ApiException("Email is already registered.", HttpStatus.CONFLICT);
-        }
         if (motariRepository.existsByNationalId(req.getNationalId())) {
             throw new ApiException("National ID is already registered.", HttpStatus.CONFLICT);
         }
@@ -142,16 +147,29 @@ public class AuthService {
             throw new ApiException("Moto plate number is already registered.", HttpStatus.CONFLICT);
         }
 
-        // Create User account
-        User user = User.builder()
-                .name(req.getFirstName() + " " + req.getLastName())
-                .phone(req.getPhone())
-                .email(req.getEmail())
-                .role(Role.MOTARI)
-                .isVerified(false) // Motaris require manual Admin verification
-                .build();
+        // Check for orphaned User row (User created but Motari profile not saved).
+        User user = userRepository.findByEmail(req.getEmail()).orElse(null);
 
-        user = userRepository.save(user);
+        if (user != null) {
+            if (motariRepository.existsById(user.getId())) {
+                throw new ApiException("Email is already registered.", HttpStatus.CONFLICT);
+            }
+            log.warn("Orphaned User detected for email '{}'. Completing motari registration.", req.getEmail());
+        } else {
+            if (userRepository.existsByPhone(req.getPhone())) {
+                throw new ApiException("Phone number is already registered.", HttpStatus.CONFLICT);
+            }
+
+            user = User.builder()
+                    .name(req.getFirstName() + " " + req.getLastName())
+                    .phone(req.getPhone())
+                    .email(req.getEmail())
+                    .role(Role.MOTARI)
+                    .isVerified(false) // Motaris require manual Admin verification
+                    .build();
+
+            user = userRepository.save(user);
+        }
 
         // Create Motari Profile
         Motari motari = Motari.builder()

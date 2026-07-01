@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.springframework.data.domain.Persistable;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -16,10 +17,31 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Motari {
+public class Motari implements Persistable<UUID> {
 
     @Id
     private UUID id;
+
+    /**
+     * Transient flag used by Spring Data JPA to determine whether to call
+     * persist() or merge() on save(). This is required because @MapsId sets
+     * the ID explicitly, which would otherwise cause JPA to always call
+     * merge() (UPDATE) instead of persist() (INSERT) for new entities.
+     */
+    @Transient
+    @Builder.Default
+    private boolean isNew = true;
+
+    @Override
+    public boolean isNew() {
+        return isNew;
+    }
+
+    @PostPersist
+    @PostLoad
+    void markNotNew() {
+        this.isNew = false;
+    }
 
     @OneToOne(fetch = FetchType.LAZY)
     @MapsId

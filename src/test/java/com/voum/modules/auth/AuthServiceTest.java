@@ -86,8 +86,9 @@ class AuthServiceTest {
 
         // Mock OTP check
         when(valueOperations.get("otp:" + email)).thenReturn(code);
+        // New flow: findByEmail is called first; returning empty means fresh registration
+        when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
         when(userRepository.existsByPhone(phone)).thenReturn(false);
-        when(userRepository.existsByEmail(email)).thenReturn(false);
 
         // Mock User Save
         UUID generatedId = UUID.randomUUID();
