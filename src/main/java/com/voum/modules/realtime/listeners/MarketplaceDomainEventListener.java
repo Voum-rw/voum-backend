@@ -230,4 +230,18 @@ public class MarketplaceDomainEventListener {
         log.info("Broadcasting TripCancelledEvent for trip: {}", trip.getId());
         redisPublisher.publish("CANCELLED", null, trip.getId(), null, tripMapper.toResponse(trip));
     }
+
+    @EventListener
+    public void handleTripLocationUpdated(com.voum.modules.tracking.events.TripLocationUpdatedEvent event) {
+        log.debug("Handling TripLocationUpdatedEvent for trip: {}", event.getTripId());
+
+        TripLocationUpdatedMessage payload = TripLocationUpdatedMessage.builder()
+                .latitude(event.getLatitude())
+                .longitude(event.getLongitude())
+                .speedKmh(event.getSpeedKmh())
+                .recordedAt(event.getRecordedAt())
+                .build();
+
+        redisPublisher.publish("LOCATION_UPDATED", null, event.getTripId(), null, payload);
+    }
 }

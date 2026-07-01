@@ -91,6 +91,9 @@ public class Trip {
     @Column(name = "current_longitude")
     private Double currentLongitude;
 
+    @Column(name = "last_location_update_at")
+    private Instant lastLocationUpdateAt;
+
     @NotNull
     @Column(name = "last_status_change_at", nullable = false)
     private Instant lastStatusChangeAt;

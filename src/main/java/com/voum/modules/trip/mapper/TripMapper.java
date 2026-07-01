@@ -33,6 +33,7 @@ public class TripMapper {
                 .cancelledBy(trip.getCancelledBy())
                 .currentLatitude(trip.getCurrentLatitude())
                 .currentLongitude(trip.getCurrentLongitude())
+                .lastLocationUpdateAt(trip.getLastLocationUpdateAt())
                 .lastStatusChangeAt(trip.getLastStatusChangeAt())
                 .createdAt(trip.getCreatedAt())
                 .startedAt(trip.getStartedAt())

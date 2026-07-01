@@ -38,6 +38,7 @@ public class TripResponse {
     
     private Double currentLatitude;
     private Double currentLongitude;
+    private Instant lastLocationUpdateAt;
     
     private Instant lastStatusChangeAt;
     private Instant createdAt;
