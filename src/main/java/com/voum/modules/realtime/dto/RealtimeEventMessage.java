@@ -22,5 +22,6 @@ public class RealtimeEventMessage implements Serializable {
     private long sequence;
     private List<UUID> driverIds; // for Motari targeted broadcasts
     private UUID requestId;       // for passenger broadcast channel
+    private UUID tripId;          // for trip broadcast channel
     private Object payload;       // actual event payload (e.g. RequestCreatedMessage, OfferCreatedMessage)
 }

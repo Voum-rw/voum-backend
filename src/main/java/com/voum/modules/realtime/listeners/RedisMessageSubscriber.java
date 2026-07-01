@@ -47,6 +47,13 @@ public class RedisMessageSubscriber implements MessageListener {
                 log.debug("Forwarding payload to request topic: {}", destination);
             }
 
+            // 3. Broadcast to trip channel
+            if (event.getTripId() != null) {
+                String destination = "/topic/trip/" + event.getTripId();
+                messagingTemplate.convertAndSend(destination, event.getPayload());
+                log.debug("Forwarding payload to trip topic: {}", destination);
+            }
+
         } catch (IOException e) {
             log.error("Failed to deserialize realtime event message from Redis", e);
         }

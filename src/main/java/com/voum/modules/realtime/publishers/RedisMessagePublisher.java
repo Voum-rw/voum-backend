@@ -27,7 +27,7 @@ public class RedisMessagePublisher {
      * Publishes a real-time event message to the Redis Pub/Sub channel.
      * Generates a global sequence number using Redis increment to ensure ordering.
      */
-    public void publish(String eventType, UUID requestId, List<UUID> driverIds, Object payload) {
+    public void publish(String eventType, UUID requestId, UUID tripId, List<UUID> driverIds, Object payload) {
         try {
             // Generate sequential sequence number using Redis increment
             Long sequence = redisTemplate.opsForValue().increment(SEQUENCE_REDIS_KEY);
@@ -40,6 +40,7 @@ public class RedisMessagePublisher {
                     .eventVersion(1)
                     .sequence(sequence)
                     .requestId(requestId)
+                    .tripId(tripId)
                     .driverIds(driverIds)
                     .payload(payload)
                     .build();

@@ -28,6 +28,8 @@ public class SubscriptionAuthInterceptor implements ChannelInterceptor {
 
     private final JwtTokenProvider tokenProvider;
     private final RideRequestRepository rideRequestRepository;
+    @org.springframework.context.annotation.Lazy
+    private final com.voum.modules.trip.repository.TripRepository tripRepository;
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -107,6 +109,22 @@ public class SubscriptionAuthInterceptor implements ChannelInterceptor {
                     }
                 } catch (IllegalArgumentException e) {
                     throw new IllegalArgumentException("Access Denied: Invalid request ID format.");
+                }
+            } else if (dest.startsWith("/topic/trip/")) {
+                String tripIdStr = dest.substring("/topic/trip/".length());
+                try {
+                    UUID tripId = UUID.fromString(tripIdStr);
+                    com.voum.modules.trip.entity.Trip trip = tripRepository.findById(tripId).orElse(null);
+                    if (trip == null) {
+                        log.warn("WebSocket SUBSCRIBE rejected: Trip {} not found", tripId);
+                        throw new IllegalArgumentException("Access Denied: Trip not found.");
+                    }
+                    if (!trip.getPassengerId().equals(userId) && !trip.getMotariId().equals(userId)) {
+                        log.warn("WebSocket SUBSCRIBE rejected: User {} is not assigned to trip {}", userId, tripId);
+                        throw new IllegalArgumentException("Access Denied: You are not authorized to subscribe to this trip.");
+                    }
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalArgumentException("Access Denied: Invalid trip ID format.");
                 }
             }
         }

@@ -8,6 +8,9 @@ import com.voum.modules.marketplace.events.*;
 import com.voum.modules.marketplace.repository.RideRequestRepository;
 import com.voum.modules.realtime.dto.*;
 import com.voum.modules.realtime.publishers.RedisMessagePublisher;
+import com.voum.modules.trip.entity.Trip;
+import com.voum.modules.trip.events.*;
+import com.voum.modules.trip.mapper.TripMapper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +30,7 @@ public class MarketplaceDomainEventListener {
     private final RedisMessagePublisher redisPublisher;
     private final LocationService locationService;
     private final RideRequestRepository rideRequestRepository;
+    private final TripMapper tripMapper;
 
     @EventListener
     public void handleRequestCreated(RideRequestCreatedEvent event) {
@@ -67,7 +71,7 @@ public class MarketplaceDomainEventListener {
                 .build();
 
         // Publish to Redis channel to broadcast to the targeted nearby drivers
-        redisPublisher.publish("REQUEST_CREATED", null, driverIds, payload);
+        redisPublisher.publish("REQUEST_CREATED", null, null, driverIds, payload);
     }
 
     @EventListener
@@ -89,7 +93,7 @@ public class MarketplaceDomainEventListener {
                 .build();
 
         // Publish to Redis channel to broadcast to the passenger topic
-        redisPublisher.publish("NEW_OFFER", offer.getRideRequestId(), null, payload);
+        redisPublisher.publish("NEW_OFFER", offer.getRideRequestId(), null, null, payload);
     }
 
     @EventListener
@@ -110,7 +114,7 @@ public class MarketplaceDomainEventListener {
                 .offersCount(offersCount)
                 .build();
 
-        redisPublisher.publish("OFFER_UPDATED", offer.getRideRequestId(), null, payload);
+        redisPublisher.publish("OFFER_UPDATED", offer.getRideRequestId(), null, null, payload);
     }
 
     @EventListener
@@ -129,7 +133,7 @@ public class MarketplaceDomainEventListener {
                 .offersCount(offersCount)
                 .build();
 
-        redisPublisher.publish("OFFER_WITHDRAWN", offer.getRideRequestId(), null, payload);
+        redisPublisher.publish("OFFER_WITHDRAWN", offer.getRideRequestId(), null, null, payload);
     }
 
     @EventListener
@@ -145,7 +149,7 @@ public class MarketplaceDomainEventListener {
                 .motariId(offer.getMotariId())
                 .build();
 
-        redisPublisher.publish("OFFER_ACCEPTED", request.getId(), null, payload);
+        redisPublisher.publish("OFFER_ACCEPTED", request.getId(), null, null, payload);
     }
 
     @EventListener
@@ -158,7 +162,7 @@ public class MarketplaceDomainEventListener {
                 .requestId(request.getId())
                 .build();
 
-        redisPublisher.publish("REQUEST_EXPIRED", request.getId(), null, payload);
+        redisPublisher.publish("REQUEST_EXPIRED", request.getId(), null, null, payload);
     }
 
     @EventListener
@@ -171,6 +175,59 @@ public class MarketplaceDomainEventListener {
                 .requestId(request.getId())
                 .build();
 
-        redisPublisher.publish("REQUEST_CANCELLED", request.getId(), null, payload);
+        redisPublisher.publish("REQUEST_CANCELLED", request.getId(), null, null, payload);
+    }
+
+    // ==========================================
+    // Trip Lifecycle Listeners
+    // ==========================================
+
+    @EventListener
+    public void handleTripCreated(TripCreatedEvent event) {
+        Trip trip = event.getTrip();
+        log.info("Broadcasting TripCreatedEvent for trip: {}", trip.getId());
+        redisPublisher.publish("TRIP_CREATED", null, trip.getId(), null, tripMapper.toResponse(trip));
+    }
+
+    @EventListener
+    public void handleMotariEnRoute(MotariEnRouteEvent event) {
+        Trip trip = event.getTrip();
+        log.info("Broadcasting MotariEnRouteEvent for trip: {}", trip.getId());
+        redisPublisher.publish("MOTARI_EN_ROUTE", null, trip.getId(), null, tripMapper.toResponse(trip));
+    }
+
+    @EventListener
+    public void handleMotariArrived(MotariArrivedEvent event) {
+        Trip trip = event.getTrip();
+        log.info("Broadcasting MotariArrivedEvent for trip: {}", trip.getId());
+        redisPublisher.publish("MOTARI_ARRIVED", null, trip.getId(), null, tripMapper.toResponse(trip));
+    }
+
+    @EventListener
+    public void handlePassengerBoarded(PassengerBoardedEvent event) {
+        Trip trip = event.getTrip();
+        log.info("Broadcasting PassengerBoardedEvent for trip: {}", trip.getId());
+        redisPublisher.publish("PASSENGER_ONBOARD", null, trip.getId(), null, tripMapper.toResponse(trip));
+    }
+
+    @EventListener
+    public void handleTripStarted(TripStartedEvent event) {
+        Trip trip = event.getTrip();
+        log.info("Broadcasting TripStartedEvent for trip: {}", trip.getId());
+        redisPublisher.publish("IN_PROGRESS", null, trip.getId(), null, tripMapper.toResponse(trip));
+    }
+
+    @EventListener
+    public void handleTripCompleted(TripCompletedEvent event) {
+        Trip trip = event.getTrip();
+        log.info("Broadcasting TripCompletedEvent for trip: {}", trip.getId());
+        redisPublisher.publish("COMPLETED", null, trip.getId(), null, tripMapper.toResponse(trip));
+    }
+
+    @EventListener
+    public void handleTripCancelled(TripCancelledEvent event) {
+        Trip trip = event.getTrip();
+        log.info("Broadcasting TripCancelledEvent for trip: {}", trip.getId());
+        redisPublisher.publish("CANCELLED", null, trip.getId(), null, tripMapper.toResponse(trip));
     }
 }

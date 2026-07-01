@@ -13,11 +13,17 @@ import com.voum.modules.realtime.listeners.MarketplaceDomainEventListener;
 import com.voum.modules.realtime.listeners.RedisMessageSubscriber;
 import com.voum.modules.realtime.publishers.RedisMessagePublisher;
 import com.voum.modules.realtime.websocket.SubscriptionAuthInterceptor;
+import com.voum.modules.trip.dto.TripResponse;
+import com.voum.modules.trip.entity.Trip;
+import com.voum.modules.trip.events.TripCreatedEvent;
+import com.voum.modules.trip.mapper.TripMapper;
+import com.voum.modules.trip.repository.TripRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.messaging.MessageChannel;
@@ -47,6 +53,9 @@ public class RealtimeBroadcastingTest {
     private RideRequestRepository rideRequestRepository;
 
     @Mock
+    private TripRepository tripRepository;
+
+    @Mock
     private RedisMessagePublisher redisPublisher;
 
     @Mock
@@ -55,6 +64,9 @@ public class RealtimeBroadcastingTest {
     @Mock
     private SimpMessagingTemplate messagingTemplate;
 
+    @Spy
+    private TripMapper tripMapper;
+
     private SubscriptionAuthInterceptor authInterceptor;
     private MarketplaceDomainEventListener domainEventListener;
     private RedisMessageSubscriber messageSubscriber;
@@ -62,8 +74,8 @@ public class RealtimeBroadcastingTest {
 
     @BeforeEach
     public void setup() {
-        authInterceptor = new SubscriptionAuthInterceptor(tokenProvider, rideRequestRepository);
-        domainEventListener = new MarketplaceDomainEventListener(redisPublisher, locationService, rideRequestRepository);
+        authInterceptor = new SubscriptionAuthInterceptor(tokenProvider, rideRequestRepository, tripRepository);
+        domainEventListener = new MarketplaceDomainEventListener(redisPublisher, locationService, rideRequestRepository, tripMapper);
         objectMapper = new ObjectMapper();
         messageSubscriber = new RedisMessageSubscriber(messagingTemplate, objectMapper);
     }
@@ -194,6 +206,59 @@ public class RealtimeBroadcastingTest {
         );
     }
 
+    @Test
+    public void testSubscribe_ownTripChannel_shouldSucceed() {
+        UUID passengerId = UUID.randomUUID();
+        UUID motariId = UUID.randomUUID();
+        UUID tripId = UUID.randomUUID();
+
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        accessor.setDestination("/topic/trip/" + tripId);
+
+        UsernamePasswordAuthenticationToken principal = new UsernamePasswordAuthenticationToken(passengerId, null);
+        accessor.setUser(principal);
+
+        Trip trip = Trip.builder()
+                .id(tripId)
+                .passengerId(passengerId)
+                .motariId(motariId)
+                .build();
+
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+
+        org.springframework.messaging.Message<?> message = org.springframework.messaging.support.MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+        org.springframework.messaging.Message<?> result = authInterceptor.preSend(message, mock(MessageChannel.class));
+        assertNotNull(result);
+    }
+
+    @Test
+    public void testSubscribe_otherTripChannel_shouldThrowException() {
+        UUID otherUserId = UUID.randomUUID();
+        UUID passengerId = UUID.randomUUID();
+        UUID motariId = UUID.randomUUID();
+        UUID tripId = UUID.randomUUID();
+
+        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.SUBSCRIBE);
+        accessor.setDestination("/topic/trip/" + tripId);
+
+        UsernamePasswordAuthenticationToken principal = new UsernamePasswordAuthenticationToken(otherUserId, null);
+        accessor.setUser(principal);
+
+        Trip trip = Trip.builder()
+                .id(tripId)
+                .passengerId(passengerId)
+                .motariId(motariId)
+                .build();
+
+        when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
+
+        org.springframework.messaging.Message<?> message = org.springframework.messaging.support.MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+        
+        assertThrows(IllegalArgumentException.class, () -> 
+            authInterceptor.preSend(message, mock(MessageChannel.class))
+        );
+    }
+
     // ==========================================
     // 2. MarketplaceDomainEventListener Tests
     // ==========================================
@@ -226,6 +291,7 @@ public class RealtimeBroadcastingTest {
 
         verify(redisPublisher, times(1)).publish(
                 eq("REQUEST_CREATED"),
+                isNull(),
                 isNull(),
                 eq(Arrays.asList(driverId1, driverId2)),
                 any(RequestCreatedMessage.class)
@@ -261,6 +327,7 @@ public class RealtimeBroadcastingTest {
                 eq("NEW_OFFER"),
                 eq(requestId),
                 isNull(),
+                isNull(),
                 any(OfferCreatedMessage.class)
         );
     }
@@ -280,7 +347,31 @@ public class RealtimeBroadcastingTest {
                 eq("OFFER_ACCEPTED"),
                 eq(requestId),
                 isNull(),
+                isNull(),
                 any(OfferAcceptedMessage.class)
+        );
+    }
+
+    @Test
+    public void testHandleTripCreatedEvent_shouldPublishToRedis() {
+        UUID tripId = UUID.randomUUID();
+        Trip trip = Trip.builder()
+                .id(tripId)
+                .passengerId(UUID.randomUUID())
+                .motariId(UUID.randomUUID())
+                .agreedPrice(2200.0)
+                .status("CREATED")
+                .build();
+
+        TripCreatedEvent event = new TripCreatedEvent(this, trip);
+        domainEventListener.handleTripCreated(event);
+
+        verify(redisPublisher, times(1)).publish(
+                eq("TRIP_CREATED"),
+                isNull(),
+                eq(tripId),
+                isNull(),
+                any(TripResponse.class)
         );
     }
 
@@ -289,9 +380,10 @@ public class RealtimeBroadcastingTest {
     // ==========================================
 
     @Test
-    public void testRedisMessageSubscriber_shouldBroadcastToDriversAndPassengers() throws Exception {
+    public void testRedisMessageSubscriber_shouldBroadcastToDriversAndPassengersAndTrips() throws Exception {
         UUID driverId = UUID.randomUUID();
         UUID requestId = UUID.randomUUID();
+        UUID tripId = UUID.randomUUID();
         
         OfferCreatedMessage payload = OfferCreatedMessage.builder()
                 .eventType("NEW_OFFER")
@@ -305,6 +397,7 @@ public class RealtimeBroadcastingTest {
                 .sequence(10L)
                 .driverIds(Collections.singletonList(driverId))
                 .requestId(requestId)
+                .tripId(tripId)
                 .payload(payload)
                 .build();
 
@@ -324,6 +417,12 @@ public class RealtimeBroadcastingTest {
         // Verify passenger WebSocket broadcast
         verify(messagingTemplate, times(1)).convertAndSend(
                 eq("/topic/request/" + requestId),
+                any(Object.class)
+        );
+
+        // Verify trip WebSocket broadcast
+        verify(messagingTemplate, times(1)).convertAndSend(
+                eq("/topic/trip/" + tripId),
                 any(Object.class)
         );
     }
