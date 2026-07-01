@@ -30,6 +30,6 @@ public class RegisterMotariRequest {
     private String nationalId;
 
     @NotBlank(message = "Moto plate number is required")
-    @Pattern(regexp = "^[R-Z]{2}\\d{3}[A-Z]{1,2}$", message = "Invalid Rwanda vehicle plate number format (e.g., RA123A)")
+    @Pattern(regexp = "^[A-Z]{2}\\d{3}[A-Z]{1,2}$", message = "Invalid Rwanda vehicle plate number format (e.g., RA123A)")
     private String motoPlateNumber;
 }
