@@ -12,6 +12,8 @@ import com.voum.modules.marketplace.entity.RideOffer;
 import com.voum.modules.marketplace.entity.RideRequest;
 import com.voum.modules.marketplace.events.RideOfferAcceptedEvent;
 import com.voum.modules.marketplace.events.RideOfferSubmittedEvent;
+import com.voum.modules.marketplace.events.RideOfferUpdatedEvent;
+import com.voum.modules.marketplace.events.RideOfferWithdrawnEvent;
 import com.voum.modules.marketplace.mapper.MarketplaceMapper;
 import com.voum.modules.marketplace.repository.RideOfferRepository;
 import com.voum.modules.marketplace.repository.RideRequestRepository;
@@ -143,6 +145,9 @@ public class RideOfferService {
         request.setRequestVersion(request.getRequestVersion() + 1);
         rideRequestRepository.save(request);
 
+        // Publish domain event
+        eventPublisher.publishEvent(new RideOfferUpdatedEvent(this, offer));
+
         UserLocation driverLoc = userLocationRepository.findByUserId(motariId).orElse(null);
         double distance = 0.0;
         if (driverLoc != null) {
@@ -179,6 +184,9 @@ public class RideOfferService {
             request.setOffersCount(request.getOffersCount() - 1);
             rideRequestRepository.save(request);
         }
+
+        // Publish domain event
+        eventPublisher.publishEvent(new RideOfferWithdrawnEvent(this, offer));
     }
 
     @Transactional(readOnly = true)
