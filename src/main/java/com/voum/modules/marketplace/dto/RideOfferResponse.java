@@ -22,4 +22,6 @@ public class RideOfferResponse {
     private Double distanceKm;
     private String status;
     private Integer updateCount;
+    private Double trustScore;
 }
+

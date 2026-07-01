@@ -18,4 +18,16 @@ public interface TripRepository extends JpaRepository<Trip, UUID> {
     List<Trip> findByPassengerIdOrderByCreatedAtDesc(UUID passengerId);
 
     List<Trip> findByMotariIdOrderByCreatedAtDesc(UUID motariId);
+
+    long countByMotariIdAndStatus(UUID motariId, String status);
+    long countByMotariIdAndStatusAndCancelledBy(UUID motariId, String status, UUID cancelledBy);
+    long countByPassengerIdAndStatus(UUID passengerId, String status);
+    long countByPassengerIdAndStatusAndCancelledBy(UUID passengerId, String status, UUID cancelledBy);
+
+    @Query("SELECT COUNT(t) FROM Trip t WHERE t.motariId = :motariId AND (t.status = 'COMPLETED' OR t.status = 'CANCELLED')")
+    long countTerminalTripsForMotari(@Param("motariId") UUID motariId);
+
+    @Query("SELECT COUNT(t) FROM Trip t WHERE t.passengerId = :passengerId AND (t.status = 'COMPLETED' OR t.status = 'CANCELLED')")
+    long countTerminalTripsForPassenger(@Param("passengerId") UUID passengerId);
 }
+

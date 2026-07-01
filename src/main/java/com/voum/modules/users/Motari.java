@@ -86,6 +86,38 @@ public class Motari implements Persistable<UUID> {
     @Column(nullable = false)
     private String status = "ACTIVE"; // ACTIVE, INACTIVE, SUSPENDED
 
+    @Column(name = "average_rating")
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.DECIMAL)
+    private Double averageRating;
+
+    @Builder.Default
+    @Column(name = "total_reviews", nullable = false)
+    private Integer totalReviews = 0;
+
+    @Builder.Default
+    @Column(name = "total_completed_trips", nullable = false)
+    private Integer totalCompletedTrips = 0;
+
+    @Builder.Default
+    @Column(name = "completion_rate", nullable = false)
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.DECIMAL)
+    private Double completionRate = 100.00;
+
+    @Builder.Default
+    @Column(name = "acceptance_rate", nullable = false)
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.DECIMAL)
+    private Double acceptanceRate = 100.00;
+
+    @Builder.Default
+    @Column(name = "cancellation_rate", nullable = false)
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.DECIMAL)
+    private Double cancellationRate = 0.00;
+
+    @Builder.Default
+    @Column(name = "trust_score", nullable = false)
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.DECIMAL)
+    private Double trustScore = 50.00;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -93,4 +125,5 @@ public class Motari implements Persistable<UUID> {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
 }

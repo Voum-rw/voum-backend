@@ -71,6 +71,19 @@ public class Passenger implements Persistable<UUID> {
     @Column(nullable = false)
     private String status = "ACTIVE";
 
+    @Column(name = "average_rating")
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.DECIMAL)
+    private Double averageRating;
+
+    @Builder.Default
+    @Column(name = "total_reviews", nullable = false)
+    private Integer totalReviews = 0;
+
+    @Builder.Default
+    @Column(name = "cancellation_rate", nullable = false)
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.DECIMAL)
+    private Double cancellationRate = 0.00;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -78,4 +91,5 @@ public class Passenger implements Persistable<UUID> {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
 }

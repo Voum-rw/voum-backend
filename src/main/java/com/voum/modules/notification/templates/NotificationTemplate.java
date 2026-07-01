@@ -61,7 +61,22 @@ public enum NotificationTemplate {
     ACCOUNT_REJECTED(
             "Account Rejected",
             "Your Voum driver account application was not approved. Please review the details and resubmit."
+    ),
+
+    // ── Reviews & Trust ───────────────────────────────────────────────────────
+    NEW_REVIEW_RECEIVED(
+            "New Review Received",
+            "A user left you a new rating and comment."
+    ),
+    REVIEW_SUBMITTED_CONFIRMATION(
+            "Review Submitted",
+            "Thank you! Your review has been recorded successfully."
+    ),
+    TRUST_SCORE_UPDATED(
+            "Trust Score Updated",
+            "Your driver trust score has been updated."
     );
+
 
     private final String title;
     private final String body;

@@ -5,7 +5,9 @@ import com.voum.modules.notification.service.PushNotificationService;
 import com.voum.modules.notification.templates.NotificationTemplate;
 import com.voum.modules.onboarding.events.AccountApprovedEvent;
 import com.voum.modules.onboarding.events.AccountRejectedEvent;
+import com.voum.modules.review.events.*;
 import com.voum.modules.trip.events.*;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -198,4 +200,57 @@ public class PushNotificationEventListener {
                 data
         );
     }
+
+    // ── Reviews & Trust Events ───────────────────────────────────────────────
+
+    /**
+     * Passenger reviewed Motari → notify Motari (new review) and Passenger (confirm).
+     */
+    @Async
+    @EventListener
+    public void onPassengerReviewedMotari(PassengerReviewedMotariEvent event) {
+        String tripId = event.getReview().getTripId().toString();
+        Map<String, String> data = new HashMap<>();
+        data.put("tripId", tripId);
+        data.put("rating", event.getReview().getRating().toString());
+
+        // Notify reviewed user (Motari)
+        pushNotificationService.sendPush(event.getReview().getReviewedUserId(), NotificationTemplate.NEW_REVIEW_RECEIVED, data);
+
+        // Notify reviewer (Passenger)
+        pushNotificationService.sendPush(event.getReview().getReviewerId(), NotificationTemplate.REVIEW_SUBMITTED_CONFIRMATION, data);
+    }
+
+    /**
+     * Motari reviewed Passenger → notify Passenger (new review) and Motari (confirm).
+     */
+    @Async
+    @EventListener
+    public void onMotariReviewedPassenger(MotariReviewedPassengerEvent event) {
+        String tripId = event.getReview().getTripId().toString();
+        Map<String, String> data = new HashMap<>();
+        data.put("tripId", tripId);
+        data.put("rating", event.getReview().getRating().toString());
+
+        // Notify reviewed user (Passenger)
+        pushNotificationService.sendPush(event.getReview().getReviewedUserId(), NotificationTemplate.NEW_REVIEW_RECEIVED, data);
+
+        // Notify reviewer (Motari)
+        pushNotificationService.sendPush(event.getReview().getReviewerId(), NotificationTemplate.REVIEW_SUBMITTED_CONFIRMATION, data);
+    }
+
+    /**
+     * Trust score updated significantly (>= 1.0) → notify Motari.
+     */
+    @Async
+    @EventListener
+    public void onTrustScoreUpdated(TrustScoreUpdatedEvent event) {
+        double diff = Math.abs(event.getNewScore() - event.getOldScore());
+        if (diff >= 1.0) {
+            Map<String, String> data = new HashMap<>();
+            data.put("trustScore", String.format("%.2f", event.getNewScore()));
+            pushNotificationService.sendPush(event.getMotariId(), NotificationTemplate.TRUST_SCORE_UPDATED, data);
+        }
+    }
 }
+

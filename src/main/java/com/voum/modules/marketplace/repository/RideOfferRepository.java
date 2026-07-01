@@ -20,4 +20,8 @@ public interface RideOfferRepository extends JpaRepository<RideOffer, UUID> {
     Optional<RideOffer> findByRideRequestIdAndMotariIdAndStatus(UUID rideRequestId, UUID motariId, String status);
 
     boolean existsByRideRequestIdAndMotariIdAndStatus(UUID rideRequestId, UUID motariId, String status);
+
+    long countByMotariId(UUID motariId);
+    long countByMotariIdAndStatus(UUID motariId, String status);
 }
+

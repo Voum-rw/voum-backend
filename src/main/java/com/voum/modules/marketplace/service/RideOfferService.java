@@ -224,14 +224,16 @@ public class RideOfferService {
             responses.add(marketplaceMapper.toOfferResponse(offer, motari, dist));
         }
 
-        // Sorting: Price first (ascending), Distance second (ascending), Response time third (createdAt ascending)
-        responses.sort(Comparator.comparing(RideOfferResponse::getOfferedPrice)
-                .thenComparing(RideOfferResponse::getDistanceKm)
+        // Sorting: Distance first (asc), Trust Score second (desc), Price third (asc), Response time fourth (createdAt asc)
+        responses.sort(Comparator.comparing(RideOfferResponse::getDistanceKm)
+                .thenComparing(o -> o.getTrustScore() != null ? o.getTrustScore() : 50.00, Comparator.reverseOrder())
+                .thenComparing(RideOfferResponse::getOfferedPrice)
                 .thenComparing(o -> {
                     RideOffer origOffer = offers.stream().filter(of -> of.getId().equals(o.getId())).findFirst().orElse(null);
                     return origOffer != null ? origOffer.getCreatedAt() : Instant.now();
                 })
         );
+
 
         return responses;
     }

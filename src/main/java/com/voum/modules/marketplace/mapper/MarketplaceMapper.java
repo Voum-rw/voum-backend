@@ -55,6 +55,8 @@ public class MarketplaceMapper {
                 .distanceKm(Math.round(distanceKm * 100.0) / 100.0) // Round to 2 decimal places
                 .status(offer.getStatus())
                 .updateCount(offer.getUpdateCount())
+                .trustScore(motari != null && motari.getTrustScore() != null ? motari.getTrustScore() : 50.00)
                 .build();
+
     }
 }
