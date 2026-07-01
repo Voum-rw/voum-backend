@@ -99,7 +99,7 @@ public class RideOfferService {
         rideRequestRepository.save(request);
 
         // Publish domain event
-        eventPublisher.publishEvent(new RideOfferSubmittedEvent(this, offer));
+        eventPublisher.publishEvent(new RideOfferSubmittedEvent(this, offer, request.getPassengerId()));
 
         double distance = HaversineCalculator.calculateDistance(
                 request.getPickupLatitude(), request.getPickupLongitude(),

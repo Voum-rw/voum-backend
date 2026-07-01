@@ -2,10 +2,13 @@ package com.voum.modules.onboarding;
 
 import com.voum.common.ApiException;
 import com.voum.modules.onboarding.dto.*;
+import com.voum.modules.onboarding.events.AccountApprovedEvent;
+import com.voum.modules.onboarding.events.AccountRejectedEvent;
 import com.voum.modules.users.*;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +30,7 @@ public class OnboardingService {
     private final UploadedDocumentRepository documentRepository;
     private final VerificationRequestRepository verificationRequestRepository;
     private final StorageService storageService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
     public OnboardingStatusResponse getOnboardingStatus(UUID userId) {
@@ -242,6 +246,7 @@ public class OnboardingService {
         userRepository.save(user);
 
         log.info("Admin [{}] approved verification request [{}] for motari [{}]", adminId, requestId, motari.getId());
+        eventPublisher.publishEvent(new AccountApprovedEvent(this, motari.getId()));
     }
 
     @Transactional
@@ -281,6 +286,7 @@ public class OnboardingService {
         userRepository.save(user);
 
         log.info("Admin [{}] rejected verification request [{}] for motari [{}] - Reason: {}", adminId, requestId, motari.getId(), req.getRejectionReason());
+        eventPublisher.publishEvent(new AccountRejectedEvent(this, motari.getId(), req.getRejectionReason()));
     }
 
     @Transactional(readOnly = true)

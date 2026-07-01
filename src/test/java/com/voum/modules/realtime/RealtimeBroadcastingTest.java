@@ -320,7 +320,7 @@ public class RealtimeBroadcastingTest {
 
         when(rideRequestRepository.findById(requestId)).thenReturn(Optional.of(request));
 
-        RideOfferSubmittedEvent event = new RideOfferSubmittedEvent(this, offer);
+        RideOfferSubmittedEvent event = new RideOfferSubmittedEvent(this, offer, UUID.randomUUID());
         domainEventListener.handleOfferSubmitted(event);
 
         verify(redisPublisher, times(1)).publish(
