@@ -2,9 +2,9 @@ package com.voum.modules.notification;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -12,21 +12,29 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Service
-@RequiredArgsConstructor
 public class EmailService {
 
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
 
-    private final JavaMailSender mailSender;
+    // Optional — app starts even if SMTP credentials are not configured
+    @Autowired(required = false)
+    private JavaMailSender mailSender;
 
-    @Value("${spring.mail.username}")
+    @Value("${spring.mail.username:}")
     private String fromEmail;
 
     /**
-     * Sends an OTP verification email asynchronously so it doesn't block the request thread.
+     * Sends an OTP verification email asynchronously.
+     * Falls back to logging if SMTP is not configured.
      */
     @Async
     public void sendOtpEmail(String toEmail, String otpCode) {
+        if (mailSender == null || fromEmail.isBlank()) {
+            // SMTP not configured — log OTP so it's visible in server logs during dev/testing
+            log.warn("[EMAIL FALLBACK] SMTP not configured. OTP for '{}' is: {}", toEmail, otpCode);
+            return;
+        }
+
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -34,13 +42,12 @@ public class EmailService {
             helper.setFrom(fromEmail, "Voum");
             helper.setTo(toEmail);
             helper.setSubject("Your Voum verification code");
-            helper.setText(buildOtpEmailHtml(otpCode), true); // true = HTML
+            helper.setText(buildOtpEmailHtml(otpCode), true);
 
             mailSender.send(message);
             log.info("OTP email sent successfully to '{}'", toEmail);
 
         } catch (MessagingException | java.io.UnsupportedEncodingException e) {
-            // Log but don't throw — OTP is already in Redis, user can retry
             log.error("Failed to send OTP email to '{}': {}", toEmail, e.getMessage());
         }
     }
@@ -72,7 +79,6 @@ public class EmailService {
                       </div>
                       <p style="color: #9ca3af; font-size: 13px; line-height: 1.5; margin: 0;">
                         If you didn't request this code, you can safely ignore this email.
-                        Someone may have entered your email address by mistake.
                       </p>
                     </div>
                     <div style="background: #f9fafb; padding: 20px 32px; text-align: center;

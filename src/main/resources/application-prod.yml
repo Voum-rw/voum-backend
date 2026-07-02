@@ -57,12 +57,13 @@ management:
       prometheus:
         enabled: true
 
-  # Gmail SMTP — credentials are injected via Render environment variables
+  # Gmail SMTP — set MAIL_USERNAME + MAIL_PASSWORD env vars on Render to enable real emails.
+  # When not set, EmailService falls back to logging the OTP code in server logs.
   mail:
     host: smtp.gmail.com
     port: 587
-    username: ${MAIL_USERNAME}
-    password: ${MAIL_PASSWORD}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
