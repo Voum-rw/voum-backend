@@ -47,8 +47,9 @@ public class EmailService {
             mailSender.send(message);
             log.info("OTP email sent successfully to '{}'", toEmail);
 
-        } catch (MessagingException | java.io.UnsupportedEncodingException e) {
+        } catch (Exception e) {
             log.error("Failed to send OTP email to '{}': {}", toEmail, e.getMessage());
+            log.warn("[EMAIL FALLBACK] SMTP failed. OTP for '{}' is: {}", toEmail, otpCode);
         }
     }
 
