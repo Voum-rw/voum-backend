@@ -56,3 +56,18 @@ management:
     export:
       prometheus:
         enabled: true
+
+  # Gmail SMTP — credentials are injected via Render environment variables
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+        debug: false

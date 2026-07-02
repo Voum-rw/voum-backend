@@ -3,6 +3,7 @@ package com.voum.modules.auth;
 import com.voum.common.ApiException;
 import com.voum.configuration.JwtTokenProvider;
 import com.voum.modules.auth.dto.*;
+import com.voum.modules.notification.EmailService;
 import com.voum.modules.users.*;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -32,6 +33,7 @@ public class AuthService {
     private final MotariRepository motariRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtTokenProvider tokenProvider;
+    private final EmailService emailService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public void sendOtp(String email) {
@@ -39,12 +41,14 @@ public class AuthService {
         int code = 100000 + secureRandom.nextInt(900000);
         String otpCode = String.valueOf(code);
 
-        // Save to Redis
+        // Save to Redis with 5-minute TTL
         String key = OTP_PREFIX + email;
         redisTemplate.opsForValue().set(key, otpCode, OTP_TTL_MINUTES, TimeUnit.MINUTES);
 
-        // Simulation logs to enable easy local / pipeline verification
-        log.info("[SMS SIMULATION] Sent OTP Code '{}' to email '{}'", otpCode, email);
+        // Send OTP via email (async — does not block the request)
+        emailService.sendOtpEmail(email, otpCode);
+
+        log.info("OTP requested for email '{}'", email);
     }
 
     private void verifyOtp(String email, String code) {
