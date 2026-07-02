@@ -37,37 +37,39 @@ public class AuthService {
     private final SecureRandom secureRandom = new SecureRandom();
 
     public void sendOtp(String email) {
+        String normalizedEmail = email.trim().toLowerCase();
         // Generate a cryptographically secure 6-digit OTP
         int code = 100000 + secureRandom.nextInt(900000);
         String otpCode = String.valueOf(code);
 
         // Save to Redis with 5-minute TTL
-        String key = OTP_PREFIX + email;
+        String key = OTP_PREFIX + normalizedEmail;
         redisTemplate.opsForValue().set(key, otpCode, OTP_TTL_MINUTES, TimeUnit.MINUTES);
 
         // Send OTP via email (async — does not block the request)
-        emailService.sendOtpEmail(email, otpCode);
+        emailService.sendOtpEmail(normalizedEmail, otpCode);
 
-        log.info("OTP requested for email '{}'", email);
+        log.info("OTP requested for email '{}'", normalizedEmail);
     }
 
     private void verifyOtp(String email, String code) {
+        String normalizedEmail = email.trim().toLowerCase();
         // Safe QA/Bypass code for testing with mock email addresses
-        if ("123456".equals(code) && (email.startsWith("test") || email.endsWith("@voum.com"))) {
-            log.info("Bypassing OTP check for test email: {}", email);
+        if ("123456".equals(code) && (normalizedEmail.startsWith("test") || normalizedEmail.endsWith("@voum.com"))) {
+            log.info("Bypassing OTP check for test email: {}", normalizedEmail);
             return;
         }
 
-        String key = OTP_PREFIX + email;
+        String key = OTP_PREFIX + normalizedEmail;
         String cachedCode = redisTemplate.opsForValue().get(key);
 
         if (cachedCode == null) {
-            log.warn("OTP verification failed: Code expired or not requested for email '{}'", email);
+            log.warn("OTP verification failed: Code expired or not requested for email '{}'", normalizedEmail);
             throw new ApiException("OTP code has expired or was not requested.", HttpStatus.BAD_REQUEST);
         }
 
         if (!cachedCode.equals(code)) {
-            log.warn("OTP verification failed: Invalid code submitted for email '{}'", email);
+            log.warn("OTP verification failed: Invalid code submitted for email '{}'", normalizedEmail);
             throw new ApiException("Invalid OTP code.", HttpStatus.BAD_REQUEST);
         }
 
@@ -77,9 +79,10 @@ public class AuthService {
 
     @Transactional
     public Optional<TokenResponse> login(VerifyOtpRequest req) {
-        verifyOtp(req.getEmail(), req.getCode());
+        String normalizedEmail = req.getEmail().trim().toLowerCase();
+        verifyOtp(normalizedEmail, req.getCode());
 
-        Optional<User> userOpt = userRepository.findByEmail(req.getEmail());
+        Optional<User> userOpt = userRepository.findByEmail(normalizedEmail);
         if (userOpt.isEmpty()) {
             return Optional.empty(); // Not registered yet
         }
@@ -94,12 +97,13 @@ public class AuthService {
 
     @Transactional
     public TokenResponse registerPassenger(RegisterPassengerRequest req) {
-        verifyOtp(req.getEmail(), req.getCode());
+        String normalizedEmail = req.getEmail().trim().toLowerCase();
+        verifyOtp(normalizedEmail, req.getCode());
 
         // Check if a fully-registered passenger already exists with this email.
         // We look up the User first; if it exists but has no Passenger profile yet
         // (orphan from a prior failed transaction), we reuse it rather than conflicting.
-        User user = userRepository.findByEmail(req.getEmail()).orElse(null);
+        User user = userRepository.findByEmail(normalizedEmail).orElse(null);
 
         if (user != null) {
             // User row exists — check if the Passenger profile was also created.
@@ -107,7 +111,7 @@ public class AuthService {
                 throw new ApiException("Email is already registered.", HttpStatus.CONFLICT);
             }
             // Orphaned user — profile was never created. Reuse the existing user row.
-            log.warn("Orphaned User detected for email '{}'. Completing passenger registration.", req.getEmail());
+            log.warn("Orphaned User detected for email '{}'. Completing passenger registration.", normalizedEmail);
         } else {
             // Fresh registration — ensure phone is unique before creating a new User.
             if (userRepository.existsByPhone(req.getPhone())) {
@@ -117,7 +121,7 @@ public class AuthService {
             user = User.builder()
                     .name(req.getFirstName() + " " + req.getLastName())
                     .phone(req.getPhone())
-                    .email(req.getEmail())
+                    .email(normalizedEmail)
                     .role(Role.PASSENGER)
                     .isVerified(true) // Passengers are auto-verified
                     .build();
@@ -142,7 +146,8 @@ public class AuthService {
 
     @Transactional
     public TokenResponse registerMotari(RegisterMotariRequest req) {
-        verifyOtp(req.getEmail(), req.getCode());
+        String normalizedEmail = req.getEmail().trim().toLowerCase();
+        verifyOtp(normalizedEmail, req.getCode());
 
         if (motariRepository.existsByNationalId(req.getNationalId())) {
             throw new ApiException("National ID is already registered.", HttpStatus.CONFLICT);
@@ -152,13 +157,13 @@ public class AuthService {
         }
 
         // Check for orphaned User row (User created but Motari profile not saved).
-        User user = userRepository.findByEmail(req.getEmail()).orElse(null);
+        User user = userRepository.findByEmail(normalizedEmail).orElse(null);
 
         if (user != null) {
             if (motariRepository.existsById(user.getId())) {
                 throw new ApiException("Email is already registered.", HttpStatus.CONFLICT);
             }
-            log.warn("Orphaned User detected for email '{}'. Completing motari registration.", req.getEmail());
+            log.warn("Orphaned User detected for email '{}'. Completing motari registration.", normalizedEmail);
         } else {
             if (userRepository.existsByPhone(req.getPhone())) {
                 throw new ApiException("Phone number is already registered.", HttpStatus.CONFLICT);
@@ -167,7 +172,7 @@ public class AuthService {
             user = User.builder()
                     .name(req.getFirstName() + " " + req.getLastName())
                     .phone(req.getPhone())
-                    .email(req.getEmail())
+                    .email(normalizedEmail)
                     .role(Role.MOTARI)
                     .isVerified(false) // Motaris require manual Admin verification
                     .build();
