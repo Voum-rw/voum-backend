@@ -1,13 +1,11 @@
 package com.voum.modules.notification;
 
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
+import com.resend.Resend;
+import com.resend.services.emails.model.CreateEmailOptions;
+import com.resend.services.emails.model.CreateEmailResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -16,40 +14,39 @@ public class EmailService {
 
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
 
-    // Optional — app starts even if SMTP credentials are not configured
-    @Autowired(required = false)
-    private JavaMailSender mailSender;
+    @Value("${resend.api.key:}")
+    private String resendApiKey;
 
-    @Value("${spring.mail.username:}")
+    @Value("${resend.from.email:onboarding@resend.dev}")
     private String fromEmail;
 
     /**
-     * Sends an OTP verification email asynchronously.
-     * Falls back to logging if SMTP is not configured.
+     * Sends an OTP verification email asynchronously via Resend's HTTPS API.
+     * Falls back to logging if the Resend API key is not configured.
      */
     @Async
     public void sendOtpEmail(String toEmail, String otpCode) {
-        if (mailSender == null || fromEmail.isBlank()) {
-            // SMTP not configured — log OTP so it's visible in server logs during dev/testing
-            log.warn("[EMAIL FALLBACK] SMTP not configured. OTP for '{}' is: {}", toEmail, otpCode);
+        if (resendApiKey.isBlank()) {
+            log.warn("[EMAIL FALLBACK] Resend API key not configured. OTP for '{}' is: {}", toEmail, otpCode);
             return;
         }
 
         try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            Resend resend = new Resend(resendApiKey);
 
-            helper.setFrom(fromEmail, "Voum");
-            helper.setTo(toEmail);
-            helper.setSubject("Your Voum verification code");
-            helper.setText(buildOtpEmailHtml(otpCode), true);
+            CreateEmailOptions params = CreateEmailOptions.builder()
+                    .from("Voum <" + fromEmail + ">")
+                    .to(toEmail)
+                    .subject("Your Voum verification code")
+                    .html(buildOtpEmailHtml(otpCode))
+                    .build();
 
-            mailSender.send(message);
-            log.info("OTP email sent successfully to '{}'", toEmail);
+            CreateEmailResponse response = resend.emails().send(params);
+            log.info("OTP email sent successfully via Resend API. Response ID: '{}'", response.getId());
 
         } catch (Exception e) {
-            log.error("Failed to send OTP email to '{}': {}", toEmail, e.getMessage());
-            log.warn("[EMAIL FALLBACK] SMTP failed. OTP for '{}' is: {}", toEmail, otpCode);
+            log.error("Failed to send OTP email via Resend to '{}': {}", toEmail, e.getMessage());
+            log.warn("[EMAIL FALLBACK] Resend failed. OTP for '{}' is: {}", toEmail, otpCode);
         }
     }
 
