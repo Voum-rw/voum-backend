@@ -3,6 +3,7 @@ package com.voum.modules.auth;
 import com.voum.common.ApiException;
 import com.voum.configuration.JwtTokenProvider;
 import com.voum.modules.auth.dto.*;
+import com.voum.modules.notification.EmailService;
 import com.voum.modules.users.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,6 +49,9 @@ class AuthServiceTest {
     @Mock
     private JwtTokenProvider tokenProvider;
 
+    @Mock
+    private EmailService emailService;
+
     @InjectMocks
     private AuthService authService;
 
@@ -60,15 +64,17 @@ class AuthServiceTest {
     @Test
     void sendOtp_shouldStoreInRedis() {
         String email = "test@voum.com";
-        
+
         authService.sendOtp(email);
-        
+
         verify(valueOperations, times(1)).set(
                 eq("otp:" + email),
                 anyString(),
                 eq(5L),
                 eq(TimeUnit.MINUTES)
         );
+        // EmailService should be called once with the email and generated OTP
+        verify(emailService, times(1)).sendOtpEmail(eq(email), anyString());
     }
 
     @Test
