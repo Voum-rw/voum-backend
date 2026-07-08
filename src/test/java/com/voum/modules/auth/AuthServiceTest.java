@@ -3,23 +3,18 @@ package com.voum.modules.auth;
 import com.voum.common.ApiException;
 import com.voum.configuration.JwtTokenProvider;
 import com.voum.modules.auth.dto.*;
-import com.voum.modules.notification.EmailService;
 import com.voum.modules.users.*;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -27,12 +22,6 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
-
-    @Mock
-    private StringRedisTemplate redisTemplate;
-
-    @Mock
-    private ValueOperations<String, String> valueOperations;
 
     @Mock
     private UserRepository userRepository;
@@ -50,51 +39,24 @@ class AuthServiceTest {
     private JwtTokenProvider tokenProvider;
 
     @Mock
-    private EmailService emailService;
+    private PasswordEncoder passwordEncoder;
 
     @InjectMocks
     private AuthService authService;
 
-    @BeforeEach
-    void setUp() {
-        // Setup Redis Operations mock
-        Mockito.lenient().when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-    }
-
     @Test
-    void sendOtp_shouldStoreInRedis() {
-        String email = "test@voum.com";
-
-        authService.sendOtp(email);
-
-        verify(valueOperations, times(1)).set(
-                eq("otp:" + email),
-                anyString(),
-                eq(5L),
-                eq(TimeUnit.MINUTES)
-        );
-        // EmailService should be called once with the email and generated OTP
-        verify(emailService, times(1)).sendOtpEmail(eq(email), anyString());
-    }
-
-    @Test
-    void registerPassenger_shouldCreateUserAndProfile() {
+    void register_shouldCreateUserAndProfile() {
         String phone = "+250780000000";
-        String email = "john@voum.rw";
-        String code = "123456";
+        String password = "securepassword";
         
-        RegisterPassengerRequest req = new RegisterPassengerRequest();
+        RegisterRequest req = new RegisterRequest();
         req.setPhone(phone);
-        req.setEmail(email);
-        req.setCode(code);
-        req.setFirstName("John");
-        req.setLastName("Doe");
+        req.setPassword(password);
+        req.setFullName("John Doe");
+        req.setRole("PASSENGER");
 
-        // Mock OTP check
-        when(valueOperations.get("otp:" + email)).thenReturn(code);
-        // New flow: findByEmail is called first; returning empty means fresh registration
-        when(userRepository.findByEmail(email)).thenReturn(Optional.empty());
         when(userRepository.existsByPhone(phone)).thenReturn(false);
+        when(passwordEncoder.encode(password)).thenReturn("hashed_password");
 
         // Mock User Save
         UUID generatedId = UUID.randomUUID();
@@ -102,7 +64,6 @@ class AuthServiceTest {
                 .id(generatedId)
                 .name("John Doe")
                 .phone(phone)
-                .email(email)
                 .role(Role.PASSENGER)
                 .build();
         when(userRepository.save(any(User.class))).thenReturn(savedUser);
@@ -112,7 +73,7 @@ class AuthServiceTest {
         when(tokenProvider.generateRefreshToken()).thenReturn("refresh_token");
         when(tokenProvider.getRefreshTokenExpiry()).thenReturn(Instant.now().plusSeconds(3600));
 
-        TokenResponse response = authService.registerPassenger(req);
+        TokenResponse response = authService.register(req);
 
         assertNotNull(response);
         assertEquals("access_token", response.getAccessToken());
@@ -125,21 +86,73 @@ class AuthServiceTest {
     }
 
     @Test
-    void registerPassenger_withDuplicatePhone_shouldThrowApiException() {
+    void register_withDuplicatePhone_shouldThrowApiException() {
         String phone = "+250780000000";
-        String email = "john@voum.rw";
-        String code = "123456";
         
-        RegisterPassengerRequest req = new RegisterPassengerRequest();
+        RegisterRequest req = new RegisterRequest();
         req.setPhone(phone);
-        req.setEmail(email);
-        req.setCode(code);
+        req.setPassword("securepassword");
+        req.setFullName("John Doe");
+        req.setRole("PASSENGER");
 
-        when(valueOperations.get("otp:" + email)).thenReturn(code);
         when(userRepository.existsByPhone(phone)).thenReturn(true);
 
-        ApiException exception = assertThrows(ApiException.class, () -> authService.registerPassenger(req));
+        ApiException exception = assertThrows(ApiException.class, () -> authService.register(req));
         assertEquals(HttpStatus.CONFLICT, exception.getStatus());
+    }
+
+    @Test
+    void login_withCorrectCredentials_shouldReturnTokens() {
+        String phone = "+250780000000";
+        String password = "securepassword";
+        
+        LoginRequest req = new LoginRequest();
+        req.setPhone(phone);
+        req.setPassword(password);
+
+        UUID userId = UUID.randomUUID();
+        User user = User.builder()
+                .id(userId)
+                .phone(phone)
+                .name("John Doe")
+                .password("hashed_password")
+                .role(Role.PASSENGER)
+                .build();
+
+        when(userRepository.findByPhone(phone)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(password, "hashed_password")).thenReturn(true);
+
+        // Mock JWT generation
+        when(tokenProvider.generateAccessToken(eq(userId), eq(phone), eq("PASSENGER"))).thenReturn("access_token");
+        when(tokenProvider.generateRefreshToken()).thenReturn("refresh_token");
+        when(tokenProvider.getRefreshTokenExpiry()).thenReturn(Instant.now().plusSeconds(3600));
+
+        TokenResponse response = authService.login(req);
+
+        assertNotNull(response);
+        assertEquals("access_token", response.getAccessToken());
+        assertEquals("refresh_token", response.getRefreshToken());
+    }
+
+    @Test
+    void login_withIncorrectPassword_shouldThrowApiException() {
+        String phone = "+250780000000";
+        String password = "securepassword";
+        
+        LoginRequest req = new LoginRequest();
+        req.setPhone(phone);
+        req.setPassword(password);
+
+        User user = User.builder()
+                .phone(phone)
+                .password("hashed_password")
+                .build();
+
+        when(userRepository.findByPhone(phone)).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(password, "hashed_password")).thenReturn(false);
+
+        ApiException exception = assertThrows(ApiException.class, () -> authService.login(req));
+        assertEquals(HttpStatus.UNAUTHORIZED, exception.getStatus());
     }
 
     @Test
