@@ -107,4 +107,20 @@ public class UserService {
         userRepository.save(user);
         return getProfile(userId);
     }
+
+    @Transactional
+    public void saveDeviceToken(UUID userId, String fcmToken) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ApiException("User not found.", HttpStatus.NOT_FOUND));
+        user.setFcmToken(fcmToken);
+        userRepository.save(user);
+    }
+
+    @Transactional
+    public void updateLanguage(UUID userId, String language) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ApiException("User not found.", HttpStatus.NOT_FOUND));
+        user.setPreferredLanguage(language);
+        userRepository.save(user);
+    }
 }

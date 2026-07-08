@@ -97,6 +97,10 @@ public enum NotificationTemplate {
     LOST_ITEM_UPDATED(
             "Lost Item Report Update",
             "There has been an update regarding your reported lost item."
+    ),
+    NEW_CHAT_MESSAGE(
+            "New Chat Message",
+            "You have received a new message."
     );
 
 

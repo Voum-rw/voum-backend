@@ -3,199 +3,110 @@ package com.voum.modules.auth;
 import com.voum.common.ApiException;
 import com.voum.configuration.JwtTokenProvider;
 import com.voum.modules.auth.dto.*;
-import com.voum.modules.notification.EmailService;
 import com.voum.modules.users.*;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.security.SecureRandom;
-import java.time.Instant;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
-    private static final String OTP_PREFIX = "otp:";
-    private static final long OTP_TTL_MINUTES = 5;
 
-    private final StringRedisTemplate redisTemplate;
     private final UserRepository userRepository;
     private final PassengerRepository passengerRepository;
     private final MotariRepository motariRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtTokenProvider tokenProvider;
-    private final EmailService emailService;
-    private final SecureRandom secureRandom = new SecureRandom();
+    private final PasswordEncoder passwordEncoder;
 
-    public void sendOtp(String email) {
-        String normalizedEmail = email.trim().toLowerCase();
-        // Generate a cryptographically secure 6-digit OTP
-        int code = 100000 + secureRandom.nextInt(900000);
-        String otpCode = String.valueOf(code);
-
-        // Save to Redis with 5-minute TTL
-        String key = OTP_PREFIX + normalizedEmail;
-        redisTemplate.opsForValue().set(key, otpCode, OTP_TTL_MINUTES, TimeUnit.MINUTES);
-
-        // Send OTP via email (async — does not block the request)
-        emailService.sendOtpEmail(normalizedEmail, otpCode);
-
-        log.info("OTP requested for email '{}'", normalizedEmail);
-    }
-
-    private void verifyOtp(String email, String code) {
-        String normalizedEmail = email.trim().toLowerCase();
-        // Safe QA/Bypass code for testing with mock email addresses
-        if ("123456".equals(code) && (normalizedEmail.startsWith("test") || normalizedEmail.endsWith("@voum.com"))) {
-            log.info("Bypassing OTP check for test email: {}", normalizedEmail);
-            return;
-        }
-
-        String key = OTP_PREFIX + normalizedEmail;
-        String cachedCode = redisTemplate.opsForValue().get(key);
-
-        if (cachedCode == null) {
-            log.warn("OTP verification failed: Code expired or not requested for email '{}'", normalizedEmail);
-            throw new ApiException("OTP code has expired or was not requested.", HttpStatus.BAD_REQUEST);
-        }
-
-        if (!cachedCode.equals(code)) {
-            log.warn("OTP verification failed: Invalid code submitted for email '{}'", normalizedEmail);
-            throw new ApiException("Invalid OTP code.", HttpStatus.BAD_REQUEST);
-        }
-
-        // Remove OTP on successful verification
-        redisTemplate.delete(key);
-    }
+    // ──────────────────────────────────────────────────────────────────────────
+    // REGISTER  (phone + password, no OTP)
+    // ──────────────────────────────────────────────────────────────────────────
 
     @Transactional
-    public Optional<TokenResponse> login(VerifyOtpRequest req) {
-        String normalizedEmail = req.getEmail().trim().toLowerCase();
-        verifyOtp(normalizedEmail, req.getCode());
+    public TokenResponse register(RegisterRequest req) {
+        String phone = req.getPhone().trim();
+        String role  = req.getRole().trim().toUpperCase();
 
-        Optional<User> userOpt = userRepository.findByEmail(normalizedEmail);
-        if (userOpt.isEmpty()) {
-            return Optional.empty(); // Not registered yet
+        if (userRepository.existsByPhone(phone)) {
+            throw new ApiException("This phone number is already registered.", HttpStatus.CONFLICT);
         }
 
-        User user = userOpt.get();
+        String hashedPassword = passwordEncoder.encode(req.getPassword());
+
+        User user = User.builder()
+                .name(req.getFullName().trim())
+                .phone(phone)
+                .password(hashedPassword)
+                .role(Role.valueOf(role))
+                .isVerified(role.equals("PASSENGER"))   // Passengers auto-verified; Motaris need admin
+                .build();
+
+        user = userRepository.save(user);
+
+        if (role.equals("PASSENGER")) {
+            Passenger passenger = Passenger.builder()
+                    .id(user.getId())
+                    .user(user)
+                    .firstName(extractFirstName(req.getFullName()))
+                    .lastName(extractLastName(req.getFullName()))
+                    .phoneNumber(phone)
+                    .build();
+            passengerRepository.save(passenger);
+            log.info("Passenger registered: {}", user.getId());
+
+        } else if (role.equals("MOTARI")) {
+            validateMotariExtras(req);
+
+            Motari motari = Motari.builder()
+                    .id(user.getId())
+                    .user(user)
+                    .firstName(extractFirstName(req.getFullName()))
+                    .lastName(extractLastName(req.getFullName()))
+                    .phoneNumber(phone)
+                    .nationalId(req.getNationalId().trim())
+                    .motoPlateNumber(req.getMotoPlateNumber().trim().toUpperCase())
+                    .build();
+            motariRepository.save(motari);
+            log.info("Motari registered (pending admin approval): {}", user.getId());
+        }
+
+        return createSession(user);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // LOGIN  (phone + password)
+    // ──────────────────────────────────────────────────────────────────────────
+
+    @Transactional
+    public TokenResponse login(LoginRequest req) {
+        String phone = req.getPhone().trim();
+
+        User user = userRepository.findByPhone(phone)
+                .orElseThrow(() -> new ApiException(
+                        "Account not found. Please sign up first.", HttpStatus.NOT_FOUND));
+
         if (user.getIsBlocked()) {
             throw new ApiException("Your account has been suspended.", HttpStatus.FORBIDDEN);
         }
 
-        return Optional.of(createSession(user));
-    }
-
-    @Transactional
-    public TokenResponse registerPassenger(RegisterPassengerRequest req) {
-        String normalizedEmail = req.getEmail().trim().toLowerCase();
-        verifyOtp(normalizedEmail, req.getCode());
-
-        // Check if a fully-registered passenger already exists with this email.
-        // We look up the User first; if it exists but has no Passenger profile yet
-        // (orphan from a prior failed transaction), we reuse it rather than conflicting.
-        User user = userRepository.findByEmail(normalizedEmail).orElse(null);
-
-        if (user != null) {
-            // User row exists — check if the Passenger profile was also created.
-            if (passengerRepository.existsById(user.getId())) {
-                throw new ApiException("Email is already registered.", HttpStatus.CONFLICT);
-            }
-            // Orphaned user — profile was never created. Reuse the existing user row.
-            log.warn("Orphaned User detected for email '{}'. Completing passenger registration.", normalizedEmail);
-        } else {
-            // Fresh registration — ensure phone is unique before creating a new User.
-            if (userRepository.existsByPhone(req.getPhone())) {
-                throw new ApiException("Phone number is already registered.", HttpStatus.CONFLICT);
-            }
-
-            user = User.builder()
-                    .name(req.getFirstName() + " " + req.getLastName())
-                    .phone(req.getPhone())
-                    .email(normalizedEmail)
-                    .role(Role.PASSENGER)
-                    .isVerified(true) // Passengers are auto-verified
-                    .build();
-
-            user = userRepository.save(user);
+        if (user.getPassword() == null || !passwordEncoder.matches(req.getPassword(), user.getPassword())) {
+            throw new ApiException("Incorrect password.", HttpStatus.UNAUTHORIZED);
         }
 
-        // Create Passenger Profile
-        Passenger passenger = Passenger.builder()
-                .id(user.getId())
-                .user(user)
-                .firstName(req.getFirstName())
-                .lastName(req.getLastName())
-                .phoneNumber(req.getPhone())
-                .build();
-
-        passengerRepository.save(passenger);
-
-        log.info("Successfully registered Passenger profile for user: {}", user.getId());
+        log.info("User logged in: {}", user.getId());
         return createSession(user);
     }
 
-    @Transactional
-    public TokenResponse registerMotari(RegisterMotariRequest req) {
-        String normalizedEmail = req.getEmail().trim().toLowerCase();
-        verifyOtp(normalizedEmail, req.getCode());
-
-        if (motariRepository.existsByNationalId(req.getNationalId())) {
-            throw new ApiException("National ID is already registered.", HttpStatus.CONFLICT);
-        }
-        if (motariRepository.existsByMotoPlateNumber(req.getMotoPlateNumber())) {
-            throw new ApiException("Moto plate number is already registered.", HttpStatus.CONFLICT);
-        }
-
-        // Check for orphaned User row (User created but Motari profile not saved).
-        User user = userRepository.findByEmail(normalizedEmail).orElse(null);
-
-        if (user != null) {
-            if (motariRepository.existsById(user.getId())) {
-                throw new ApiException("Email is already registered.", HttpStatus.CONFLICT);
-            }
-            log.warn("Orphaned User detected for email '{}'. Completing motari registration.", normalizedEmail);
-        } else {
-            if (userRepository.existsByPhone(req.getPhone())) {
-                throw new ApiException("Phone number is already registered.", HttpStatus.CONFLICT);
-            }
-
-            user = User.builder()
-                    .name(req.getFirstName() + " " + req.getLastName())
-                    .phone(req.getPhone())
-                    .email(normalizedEmail)
-                    .role(Role.MOTARI)
-                    .isVerified(false) // Motaris require manual Admin verification
-                    .build();
-
-            user = userRepository.save(user);
-        }
-
-        // Create Motari Profile
-        Motari motari = Motari.builder()
-                .id(user.getId())
-                .user(user)
-                .firstName(req.getFirstName())
-                .lastName(req.getLastName())
-                .phoneNumber(req.getPhone())
-                .nationalId(req.getNationalId())
-                .motoPlateNumber(req.getMotoPlateNumber())
-                .build();
-
-        motariRepository.save(motari);
-
-        log.info("Successfully registered Motari profile for user: {}", user.getId());
-        return createSession(user);
-    }
+    // ──────────────────────────────────────────────────────────────────────────
+    // TOKEN ROTATION  (refresh token)
+    // ──────────────────────────────────────────────────────────────────────────
 
     @Transactional
     public TokenResponse rotateTokens(String oldRefreshTokenStr) {
@@ -203,7 +114,7 @@ public class AuthService {
                 .orElseThrow(() -> new ApiException("Invalid or expired session token.", HttpStatus.UNAUTHORIZED));
 
         if (oldToken.getRevoked() || oldToken.isExpired()) {
-            // Revoke all tokens for this user if we detect reuse of a revoked token (potential theft)
+            // Potential token theft — revoke all sessions for this user
             refreshTokenRepository.deleteByUser(oldToken.getUser());
             throw new ApiException("Session has been revoked or expired.", HttpStatus.UNAUTHORIZED);
         }
@@ -213,27 +124,32 @@ public class AuthService {
             throw new ApiException("User account is suspended.", HttpStatus.FORBIDDEN);
         }
 
-        // Revoke the old token
         oldToken.setRevoked(true);
         refreshTokenRepository.save(oldToken);
 
-        // Create a new session
         return createSession(user);
     }
 
+    // ──────────────────────────────────────────────────────────────────────────
+    // LOGOUT
+    // ──────────────────────────────────────────────────────────────────────────
+
     @Transactional
     public void logout(String refreshTokenStr) {
-        refreshTokenRepository.findByToken(refreshTokenStr)
-                .ifPresent(token -> {
-                    token.setRevoked(true);
-                    refreshTokenRepository.save(token);
-                    log.info("Successfully logged out user session: {}", token.getUser().getId());
-                });
+        refreshTokenRepository.findByToken(refreshTokenStr).ifPresent(token -> {
+            token.setRevoked(true);
+            refreshTokenRepository.save(token);
+            log.info("User logged out: {}", token.getUser().getId());
+        });
     }
 
+    // ──────────────────────────────────────────────────────────────────────────
+    // HELPERS
+    // ──────────────────────────────────────────────────────────────────────────
+
     private TokenResponse createSession(User user) {
-        String accessToken = tokenProvider.generateAccessToken(user.getId(), user.getPhone(), user.getRole().name());
-        String refreshTokenStr = tokenProvider.generateRefreshToken();
+        String accessToken      = tokenProvider.generateAccessToken(user.getId(), user.getPhone(), user.getRole().name());
+        String refreshTokenStr  = tokenProvider.generateRefreshToken();
 
         RefreshToken refreshToken = RefreshToken.builder()
                 .user(user)
@@ -247,6 +163,34 @@ public class AuthService {
                 .accessToken(accessToken)
                 .refreshToken(refreshTokenStr)
                 .role(user.getRole().name())
+                .userName(user.getName())
+                .userPhone(user.getPhone())
+                .userId(user.getId())
                 .build();
+    }
+
+    private void validateMotariExtras(RegisterRequest req) {
+        if (req.getNationalId() == null || req.getNationalId().isBlank()) {
+            throw new ApiException("National ID is required for Motari registration.", HttpStatus.BAD_REQUEST);
+        }
+        if (req.getMotoPlateNumber() == null || req.getMotoPlateNumber().isBlank()) {
+            throw new ApiException("Moto plate number is required for Motari registration.", HttpStatus.BAD_REQUEST);
+        }
+        if (motariRepository.existsByNationalId(req.getNationalId().trim())) {
+            throw new ApiException("National ID is already registered.", HttpStatus.CONFLICT);
+        }
+        if (motariRepository.existsByMotoPlateNumber(req.getMotoPlateNumber().trim().toUpperCase())) {
+            throw new ApiException("Moto plate number is already registered.", HttpStatus.CONFLICT);
+        }
+    }
+
+    private String extractFirstName(String fullName) {
+        String[] parts = fullName.trim().split("\\s+", 2);
+        return parts[0];
+    }
+
+    private String extractLastName(String fullName) {
+        String[] parts = fullName.trim().split("\\s+", 2);
+        return parts.length > 1 ? parts[1] : "";
     }
 }

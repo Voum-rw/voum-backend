@@ -126,6 +126,39 @@ public class SubscriptionAuthInterceptor implements ChannelInterceptor {
                 } catch (IllegalArgumentException e) {
                     throw new IllegalArgumentException("Access Denied: Invalid trip ID format.");
                 }
+            } else if (dest.startsWith("/topic/chat/")) {
+                String contextIdStr = dest.substring("/topic/chat/".length());
+                try {
+                    UUID contextId = UUID.fromString(contextIdStr);
+                    // Try to find as RideRequest first
+                    RideRequest request = rideRequestRepository.findById(contextId).orElse(null);
+                    if (request != null) {
+                        boolean isPassenger = request.getPassengerId().equals(userId);
+                        boolean isMotari = false;
+                        if (principal instanceof org.springframework.security.core.Authentication) {
+                            isMotari = ((org.springframework.security.core.Authentication) principal).getAuthorities().stream()
+                                    .anyMatch(a -> a.getAuthority().equals("ROLE_MOTARI"));
+                        }
+                        if (!isPassenger && !isMotari) {
+                            log.warn("WebSocket SUBSCRIBE rejected: User {} not authorized to chat for request {}", userId, contextId);
+                            throw new IllegalArgumentException("Access Denied: You are not authorized to join this request's chat.");
+                        }
+                    } else {
+                        // Try to find as Trip
+                        com.voum.modules.trip.entity.Trip trip = tripRepository.findById(contextId).orElse(null);
+                        if (trip != null) {
+                            if (!trip.getPassengerId().equals(userId) && !trip.getMotariId().equals(userId)) {
+                                log.warn("WebSocket SUBSCRIBE rejected: User {} not authorized to chat for trip {}", userId, contextId);
+                                throw new IllegalArgumentException("Access Denied: You are not authorized to join this trip's chat.");
+                            }
+                        } else {
+                            log.warn("WebSocket SUBSCRIBE rejected: Chat context {} not found", contextId);
+                            throw new IllegalArgumentException("Access Denied: Conversation context not found.");
+                        }
+                    }
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalArgumentException("Access Denied: Invalid context ID format.");
+                }
             }
         }
         return message;

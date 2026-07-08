@@ -36,6 +36,16 @@ public class User {
     @Column(unique = true)
     private String email;
 
+    @Column(name = "password")
+    private String password;  // BCrypt hashed; nullable for migration safety
+
+    @Column(name = "fcm_token", length = 512)
+    private String fcmToken;  // Firebase Cloud Messaging device token
+
+    @Builder.Default
+    @Column(name = "preferred_language", length = 5, nullable = false)
+    private String preferredLanguage = "en";  // en | fr | rw
+
     @NotBlank(message = "Phone number is required")
     @Column(unique = true, nullable = false)
     private String phone;
