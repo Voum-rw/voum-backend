@@ -31,7 +31,7 @@ public class AuthService {
 
     @Transactional
     public TokenResponse register(RegisterRequest req) {
-        String phone = req.getPhone().trim();
+        String phone = normalizePhone(req.getPhone());
         String role  = req.getRole().trim().toUpperCase();
 
         if (userRepository.existsByPhone(phone)) {
@@ -86,7 +86,7 @@ public class AuthService {
 
     @Transactional
     public TokenResponse login(LoginRequest req) {
-        String phone = req.getPhone().trim();
+        String phone = normalizePhone(req.getPhone());
 
         User user = userRepository.findByPhone(phone)
                 .orElseThrow(() -> new ApiException(
@@ -191,6 +191,25 @@ public class AuthService {
 
     private String extractLastName(String fullName) {
         String[] parts = fullName.trim().split("\\s+", 2);
-        return parts.length > 1 ? parts[1] : "";
+        // If only one word is entered, use it as lastName too (avoids @NotBlank violation)
+        return parts.length > 1 ? parts[1] : parts[0];
+    }
+
+    private String normalizePhone(String phone) {
+        if (phone == null) return "";
+        String cleaned = phone.trim().replaceAll("\\s+", "");
+        if (cleaned.startsWith("+250")) {
+            return cleaned;
+        }
+        if (cleaned.startsWith("250")) {
+            return "+" + cleaned;
+        }
+        if (cleaned.startsWith("07")) {
+            return "+250" + cleaned.substring(1);
+        }
+        if (cleaned.startsWith("7") && cleaned.length() == 9) {
+            return "+250" + cleaned;
+        }
+        return cleaned;
     }
 }

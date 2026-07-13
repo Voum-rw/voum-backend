@@ -1,9 +1,17 @@
 spring:
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:voum_db}
-    username: ${DB_USERNAME:voum_user}
-    password: ${DB_PASSWORD:voum_pass}
+    # Supabase shared pooler (PgBouncer transaction mode)
+    # prepareThreshold=0 is REQUIRED — PgBouncer doesn't support named prepared statements
+    url: jdbc:postgresql://aws-1-eu-central-1.pooler.supabase.com:6543/postgres?sslmode=require&prepareThreshold=0
+    username: postgres.dpjcotkkgyxfhxdolptf
+    password: ${DB_PASSWORD:AqTZ2vyBEhs9X22K}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+      idle-timeout: 300000
+      connection-timeout: 20000
+      connection-init-sql: "SELECT 1"
   jpa:
     hibernate:
       ddl-auto: validate
@@ -14,5 +22,19 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
   data:
     redis:
-      host: ${SPRING_DATA_REDIS_HOST:localhost}
-      port: ${SPRING_DATA_REDIS_PORT:6379}
+      host: ${SPRING_DATA_REDIS_HOST:citrus-humorous-bone-47657.db.redis.io}
+      port: ${SPRING_DATA_REDIS_PORT:11805}
+      password: ${SPRING_DATA_REDIS_PASSWORD:6KqqMhC6hTRru0X6TdmbJfSGIACWaJoF}
+      username: ${SPRING_DATA_REDIS_USERNAME:default}
+
+# Enable Redis pub/sub listener (cloud Redis is available)
+voum:
+  redis:
+    enabled: true
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    url: jdbc:postgresql://aws-1-eu-central-1.pooler.supabase.com:6543/postgres?sslmode=require&prepareThreshold=0
+    user: postgres.dpjcotkkgyxfhxdolptf
+    password: ${DB_PASSWORD:AqTZ2vyBEhs9X22K}

@@ -21,8 +21,8 @@ public class ChatController {
     @GetMapping("/{contextId}")
     public ResponseEntity<ApiResponse<List<ChatMessageDto>>> getHistory(
             @PathVariable UUID contextId,
-            @AuthenticationPrincipal String callerId) {
-        List<ChatMessageDto> history = chatService.getHistory(contextId, UUID.fromString(callerId));
+            @AuthenticationPrincipal UUID callerId) {
+        List<ChatMessageDto> history = chatService.getHistory(contextId, callerId);
         return ResponseEntity.ok(ApiResponse.success(history, "Chat history retrieved."));
     }
 
@@ -31,8 +31,8 @@ public class ChatController {
     public ResponseEntity<ApiResponse<ChatMessageDto>> sendMessage(
             @PathVariable UUID contextId,
             @Valid @RequestBody SendMessageRequest req,
-            @AuthenticationPrincipal String senderId) {
-        ChatMessageDto dto = chatService.sendMessage(UUID.fromString(senderId), contextId, req);
+            @AuthenticationPrincipal UUID senderId) {
+        ChatMessageDto dto = chatService.sendMessage(senderId, contextId, req);
         return ResponseEntity.ok(ApiResponse.success(dto, "Message sent."));
     }
 }

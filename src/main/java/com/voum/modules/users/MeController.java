@@ -23,8 +23,8 @@ public class MeController {
     /** Get the authenticated user's full profile. */
     @GetMapping
     public ResponseEntity<ApiResponse<UserProfileResponse>> getMe(
-            @AuthenticationPrincipal String userId) {
-        UserProfileResponse profile = userService.getProfile(UUID.fromString(userId));
+            @AuthenticationPrincipal java.util.UUID userId) {
+        UserProfileResponse profile = userService.getProfile(userId);
         return ResponseEntity.ok(ApiResponse.success(profile, "Profile retrieved."));
     }
 
@@ -32,8 +32,8 @@ public class MeController {
     @PostMapping("/device-token")
     public ResponseEntity<ApiResponse<Void>> saveDeviceToken(
             @Valid @RequestBody DeviceTokenRequest req,
-            @AuthenticationPrincipal String userId) {
-        userService.saveDeviceToken(UUID.fromString(userId), req.getFcmToken());
+            @AuthenticationPrincipal java.util.UUID userId) {
+        userService.saveDeviceToken(userId, req.getFcmToken());
         return ResponseEntity.ok(ApiResponse.success(null, "Device token saved."));
     }
 
@@ -41,8 +41,8 @@ public class MeController {
     @PatchMapping("/language")
     public ResponseEntity<ApiResponse<Void>> updateLanguage(
             @Valid @RequestBody LanguageRequest req,
-            @AuthenticationPrincipal String userId) {
-        userService.updateLanguage(UUID.fromString(userId), req.getLanguage());
+            @AuthenticationPrincipal java.util.UUID userId) {
+        userService.updateLanguage(userId, req.getLanguage());
         return ResponseEntity.ok(ApiResponse.success(null, "Language updated."));
     }
 
