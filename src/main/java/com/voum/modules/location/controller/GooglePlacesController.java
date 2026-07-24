@@ -51,4 +51,32 @@ public class GooglePlacesController {
         Object response = restTemplate.getForObject(url, Object.class);
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/directions")
+    public ResponseEntity<Object> directions(
+            @RequestParam("origin") String origin,
+            @RequestParam("destination") String destination) {
+        
+        String url = UriComponentsBuilder.fromHttpUrl("https://maps.googleapis.com/maps/api/directions/json")
+                .queryParam("origin", origin)
+                .queryParam("destination", destination)
+                .queryParam("key", API_KEY)
+                .toUriString();
+
+        Object response = restTemplate.getForObject(url, Object.class);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/reverse-geocode")
+    public ResponseEntity<Object> reverseGeocode(
+            @RequestParam("latlng") String latlng) {
+        
+        String url = UriComponentsBuilder.fromHttpUrl("https://maps.googleapis.com/maps/api/geocode/json")
+                .queryParam("latlng", latlng)
+                .queryParam("key", API_KEY)
+                .toUriString();
+
+        Object response = restTemplate.getForObject(url, Object.class);
+        return ResponseEntity.ok(response);
+    }
 }
