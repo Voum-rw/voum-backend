@@ -3,6 +3,7 @@ package com.voum.modules.trip.controller;
 import com.voum.common.ApiResponse;
 import com.voum.modules.trip.dto.TripCancelRequest;
 import com.voum.modules.trip.dto.TripResponse;
+import com.voum.modules.trip.dto.TripStatsResponse;
 import com.voum.modules.trip.service.TripService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,14 @@ public class TripController {
             @AuthenticationPrincipal UUID userId) {
         List<TripResponse> responses = tripService.getMyTrips(userId);
         return ResponseEntity.ok(ApiResponse.success(responses, "Trips retrieved successfully."));
+    }
+
+    @GetMapping("/stats")
+    @PreAuthorize("hasAnyRole('PASSENGER', 'MOTARI')")
+    public ResponseEntity<ApiResponse<TripStatsResponse>> getTripStats(
+            @AuthenticationPrincipal UUID userId) {
+        TripStatsResponse response = tripService.getTripStats(userId);
+        return ResponseEntity.ok(ApiResponse.success(response, "Trip stats retrieved successfully."));
     }
 
     @PostMapping("/{id}/en-route")

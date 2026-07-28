@@ -21,6 +21,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.voum.modules.location.dto.NearbyActivityResponse;
+import com.voum.modules.marketplace.repository.RideRequestRepository;
+
 @Service
 @RequiredArgsConstructor
 public class LocationService {
@@ -30,8 +33,35 @@ public class LocationService {
     private final UserLocationRepository userLocationRepository;
     private final UserRepository userRepository;
     private final MotariRepository motariRepository;
+    private final RideRequestRepository rideRequestRepository;
     private final LocationMapper locationMapper;
     private final LocationCacheService cacheService;
+
+    @Transactional(readOnly = true)
+    public List<NearbyActivityResponse> getNearbyActivity() {
+        long activeCount = rideRequestRepository.countActiveOpenRequests(Instant.now());
+        List<NearbyActivityResponse> list = new ArrayList<>();
+        
+        if (activeCount == 0) {
+            // Quiet / Normal state when there are no active surges
+            list.add(NearbyActivityResponse.builder()
+                    .zoneName("Kigali Heights / Hub")
+                    .demandLevel("Normal")
+                    .subtitle("Wait < 3m · Moderate activity")
+                    .isHighDemand(false)
+                    .activeRequestsCount(0)
+                    .build());
+        } else {
+            list.add(NearbyActivityResponse.builder()
+                    .zoneName("Kimironko")
+                    .demandLevel("High")
+                    .subtitle("🔥 Wait < 2m · +" + activeCount + " active requests")
+                    .isHighDemand(true)
+                    .activeRequestsCount((int) activeCount)
+                    .build());
+        }
+        return list;
+    }
 
     @Transactional
     public void goOnline(UUID userId, LocationUpdateRequest req) {
@@ -47,8 +77,8 @@ public class LocationService {
         Motari motari = motariRepository.findById(userId)
                 .orElseThrow(() -> new ApiException("Motari profile not found.", HttpStatus.NOT_FOUND));
 
-        if (!"COMPLETED".equals(motari.getOnboardingStatus()) || !"APPROVED".equals(motari.getVerificationStatus())) {
-            throw new ApiException("Only approved and completed Motaris can go online.", HttpStatus.FORBIDDEN);
+        if (!"APPROVED".equals(motari.getVerificationStatus())) {
+            throw new ApiException("Account verification is required before going online. Please upload all verification documents.", HttpStatus.FORBIDDEN);
         }
 
         UserLocation location = userLocationRepository.findByUserId(userId)

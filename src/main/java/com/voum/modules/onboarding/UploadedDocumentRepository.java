@@ -10,6 +10,9 @@ import java.util.UUID;
 @Repository
 public interface UploadedDocumentRepository extends JpaRepository<UploadedDocument, UUID> {
     List<UploadedDocument> findByOwnerId(UUID ownerId);
+    List<UploadedDocument> findBySessionId(UUID sessionId);
     Optional<UploadedDocument> findByOwnerIdAndDocumentType(UUID ownerId, String documentType);
+    Optional<UploadedDocument> findTopByOwnerIdAndDocumentTypeOrderByVersionDesc(UUID ownerId, String documentType);
     boolean existsByOwnerIdAndDocumentType(UUID ownerId, String documentType);
+    boolean existsByOwnerIdAndDocumentTypeAndStatus(UUID ownerId, String documentType, String status);
 }

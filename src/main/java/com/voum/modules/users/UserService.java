@@ -8,6 +8,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.voum.modules.onboarding.OnboardingService;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
 import java.util.UUID;
 
 @Service
@@ -17,6 +20,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PassengerRepository passengerRepository;
     private final MotariRepository motariRepository;
+    private final OnboardingService onboardingService;
 
     @Transactional(readOnly = true)
     public UserProfileResponse getProfile(UUID userId) {
@@ -52,9 +56,16 @@ public class UserService {
                         .lastName(m.getLastName())
                         .nationalId(m.getNationalId())
                         .motoPlateNumber(m.getMotoPlateNumber())
+                        .motoModel(m.getMotoModel())
+                        .motoColor(m.getMotoColor())
                         .profileImage(m.getProfileImage())
                         .verificationStatus(m.getVerificationStatus())
                         .status(m.getStatus())
+                        .averageRating(m.getAverageRating())
+                        .totalCompletedTrips(m.getTotalCompletedTrips())
+                        .acceptanceRate(m.getAcceptanceRate())
+                        .completionRate(m.getCompletionRate())
+                        .createdAt(m.getCreatedAt())
                         .build())
             );
         }
@@ -122,5 +133,24 @@ public class UserService {
                 .orElseThrow(() -> new ApiException("User not found.", HttpStatus.NOT_FOUND));
         user.setPreferredLanguage(language);
         userRepository.save(user);
+    }
+
+    @Transactional
+    public UserProfileResponse updateAvatar(UUID userId, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new ApiException("Uploaded file cannot be empty.", HttpStatus.BAD_REQUEST);
+        }
+        try {
+            onboardingService.uploadDocument(
+                    userId,
+                    "PROFILE_IMAGE",
+                    file.getBytes(),
+                    file.getOriginalFilename(),
+                    file.getContentType()
+            );
+            return getProfile(userId);
+        } catch (IOException e) {
+            throw new ApiException("Failed to read image file: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 }

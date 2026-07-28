@@ -71,6 +71,12 @@ public class Motari implements Persistable<UUID> {
     @Column(name = "profile_image")
     private String profileImage;
 
+    @Column(name = "moto_model")
+    private String motoModel;
+
+    @Column(name = "moto_color")
+    private String motoColor;
+
     @Builder.Default
     @Column(name = "verification_status", nullable = false)
     private String verificationStatus = "PENDING"; // PENDING, UNDER_REVIEW, APPROVED, REJECTED, SUSPENDED

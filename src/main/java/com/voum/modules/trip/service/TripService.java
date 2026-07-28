@@ -9,6 +9,7 @@ import com.voum.modules.marketplace.entity.RideOffer;
 import com.voum.modules.marketplace.entity.RideRequest;
 import com.voum.modules.marketplace.events.RideOfferAcceptedEvent;
 import com.voum.modules.trip.dto.TripResponse;
+import com.voum.modules.trip.dto.TripStatsResponse;
 import com.voum.modules.trip.entity.Trip;
 import com.voum.modules.trip.events.*;
 import com.voum.modules.trip.mapper.TripMapper;
@@ -23,7 +24,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -99,6 +105,62 @@ public class TripService {
         return tripRepository.findAllByPassengerIdOrMotariId(userId).stream()
                 .map(tripMapper::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public TripStatsResponse getTripStats(UUID userId) {
+        List<Trip> trips = tripRepository.findAllByPassengerIdOrMotariId(userId);
+        ZoneId zone = ZoneId.of("Africa/Kigali");
+        ZonedDateTime now = ZonedDateTime.now(zone);
+        ZonedDateTime startOfToday = now.truncatedTo(ChronoUnit.DAYS);
+        ZonedDateTime startOf7Days = startOfToday.minusDays(6);
+        ZonedDateTime startOf30Days = startOfToday.minusDays(29);
+
+        long todayCount = 0;
+        long weeklyCount = 0;
+        long monthlyCount = 0;
+        long totalCompleted = 0;
+        long totalCancelled = 0;
+
+        Map<String, Long> dailyPerformance = new LinkedHashMap<>();
+        String[] days = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
+        for (String d : days) {
+            dailyPerformance.put(d, 0L);
+        }
+
+        for (Trip trip : trips) {
+            String status = trip.getStatus() != null ? trip.getStatus().toUpperCase() : "";
+            if ("COMPLETED".equals(status)) {
+                totalCompleted++;
+                if (trip.getCreatedAt() != null) {
+                    ZonedDateTime tripTime = trip.getCreatedAt().atZone(zone);
+                    if (!tripTime.isBefore(startOfToday)) {
+                        todayCount++;
+                    }
+                    if (!tripTime.isBefore(startOf7Days)) {
+                        weeklyCount++;
+                    }
+                    if (!tripTime.isBefore(startOf30Days)) {
+                        monthlyCount++;
+                    }
+                    // Current week Mon-Sun performance
+                    int dayOfWeek = tripTime.getDayOfWeek().getValue(); // 1 = Monday .. 7 = Sunday
+                    String dayKey = days[dayOfWeek - 1];
+                    dailyPerformance.put(dayKey, dailyPerformance.get(dayKey) + 1);
+                }
+            } else if ("CANCELLED".equals(status)) {
+                totalCancelled++;
+            }
+        }
+
+        return TripStatsResponse.builder()
+                .todayCompletedCount(todayCount)
+                .weeklyCompletedCount(weeklyCount)
+                .monthlyCompletedCount(monthlyCount)
+                .totalCompletedCount(totalCompleted)
+                .totalCancelledCount(totalCancelled)
+                .dailyPerformance(dailyPerformance)
+                .build();
     }
 
     @Transactional

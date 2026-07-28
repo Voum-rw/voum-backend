@@ -63,4 +63,10 @@ public class LocationController {
         List<NearbyMotariResponse> nearby = locationService.findNearbyMotaris(latitude, longitude, radiusKm);
         return ResponseEntity.ok(ApiResponse.success(nearby, "Nearby active Motaris retrieved successfully."));
     }
+
+    @GetMapping("/nearby-activity")
+    public ResponseEntity<ApiResponse<List<com.voum.modules.location.dto.NearbyActivityResponse>>> getNearbyActivity() {
+        List<com.voum.modules.location.dto.NearbyActivityResponse> activity = locationService.getNearbyActivity();
+        return ResponseEntity.ok(ApiResponse.success(activity, "Nearby demand activity retrieved successfully."));
+    }
 }

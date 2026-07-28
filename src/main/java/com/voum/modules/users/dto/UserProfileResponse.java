@@ -51,8 +51,15 @@ public class UserProfileResponse {
         private String lastName;
         private String nationalId;
         private String motoPlateNumber;
+        private String motoModel;
+        private String motoColor;
         private String profileImage;
         private String verificationStatus;
         private String status;
+        private Double averageRating;
+        private Integer totalCompletedTrips;
+        private Double acceptanceRate;
+        private Double completionRate;
+        private Instant createdAt;
     }
 }

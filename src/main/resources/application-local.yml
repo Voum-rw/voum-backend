@@ -1,7 +1,7 @@
+debug: true
+
 spring:
   datasource:
-    # Supabase shared pooler (PgBouncer transaction mode)
-    # prepareThreshold=0 is REQUIRED — PgBouncer doesn't support named prepared statements
     url: jdbc:postgresql://aws-1-eu-central-1.pooler.supabase.com:6543/postgres?sslmode=require&prepareThreshold=0
     username: postgres.dpjcotkkgyxfhxdolptf
     password: ${DB_PASSWORD:AqTZ2vyBEhs9X22K}
@@ -14,12 +14,18 @@ spring:
       connection-init-sql: "SELECT 1"
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    url: jdbc:postgresql://aws-1-eu-central-1.pooler.supabase.com:6543/postgres?sslmode=require&prepareThreshold=0
+    user: postgres.dpjcotkkgyxfhxdolptf
+    password: ${DB_PASSWORD:AqTZ2vyBEhs9X22K}
   data:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:citrus-humorous-bone-47657.db.redis.io}
@@ -27,14 +33,24 @@ spring:
       password: ${SPRING_DATA_REDIS_PASSWORD:6KqqMhC6hTRru0X6TdmbJfSGIACWaJoF}
       username: ${SPRING_DATA_REDIS_USERNAME:default}
 
-# Enable Redis pub/sub listener (cloud Redis is available)
+logging:
+  level:
+    root: INFO
+    org.springframework: DEBUG
+    org.springframework.boot.autoconfigure: DEBUG
+    org.hibernate: DEBUG
+    com.voum: DEBUG
+
 voum:
   redis:
     enabled: true
 
-  flyway:
-    enabled: true
-    baseline-on-migrate: true
-    url: jdbc:postgresql://aws-1-eu-central-1.pooler.supabase.com:6543/postgres?sslmode=require&prepareThreshold=0
-    user: postgres.dpjcotkkgyxfhxdolptf
-    password: ${DB_PASSWORD:AqTZ2vyBEhs9X22K}
+app:
+  storage:
+    type: r2
+    r2:
+      account-id: ${R2_ACCOUNT_ID:c506f5824f4bbf1cc9d2cc7863ddb3a9}
+      access-key-id: ${R2_ACCESS_KEY_ID:5eea1844410770987ccb750f061ecbda}
+      secret-access-key: ${R2_SECRET_ACCESS_KEY:c3f6aceca37206d072f79979b7453163ea9c46df2a004a6f8baaa714fac53d48}
+      bucket-name: ${R2_BUCKET_NAME:voum-data}
+      public-domain: ${R2_PUBLIC_DOMAIN:https://c506f5824f4bbf1cc9d2cc7863ddb3a9.r2.cloudflarestorage.com}

@@ -46,6 +46,15 @@ public class MeController {
         return ResponseEntity.ok(ApiResponse.success(null, "Language updated."));
     }
 
+    /** Upload or update user avatar image. */
+    @PostMapping(value = "/avatar", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<UserProfileResponse>> updateAvatar(
+            @AuthenticationPrincipal java.util.UUID userId,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        UserProfileResponse profile = userService.updateAvatar(userId, file);
+        return ResponseEntity.ok(ApiResponse.success(profile, "Profile image updated successfully."));
+    }
+
     // ── Inline request DTOs ──────────────────────────────────────────────────
 
     @Data
