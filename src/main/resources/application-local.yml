@@ -2,9 +2,9 @@ debug: true
 
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:voum_db}}
-    username: ${SPRING_DATASOURCE_USERNAME:${DB_USERNAME:postgres}}
-    password: ${SPRING_DATASOURCE_PASSWORD:${DB_PASSWORD:postgres}}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://db.dpjcotkkgyxfhxdolptf.supabase.co:5432/postgres?sslmode=require}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${DB_PASSWORD:AqTZ2vyBEhs9X22K}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 5
@@ -21,7 +21,7 @@ spring:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
   flyway:
-    enabled: ${FLYWAY_ENABLED:false}
+    enabled: true
     baseline-on-migrate: true
     url: ${SPRING_FLYWAY_URL:${spring.datasource.url}}
     user: ${SPRING_FLYWAY_USER:${spring.datasource.username}}
