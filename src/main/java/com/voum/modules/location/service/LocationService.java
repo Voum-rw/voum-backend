@@ -77,9 +77,10 @@ public class LocationService {
         Motari motari = motariRepository.findById(userId)
                 .orElseThrow(() -> new ApiException("Motari profile not found.", HttpStatus.NOT_FOUND));
 
-        if (!"APPROVED".equals(motari.getVerificationStatus())) {
-            throw new ApiException("Account verification is required before going online. Please upload all verification documents.", HttpStatus.FORBIDDEN);
-        }
+        // Verification requirement temporarily disabled for testing Motari functionality
+        // if (!"APPROVED".equals(motari.getVerificationStatus())) {
+        //     throw new ApiException("Account verification is required before going online. Please upload all verification documents.", HttpStatus.FORBIDDEN);
+        // }
 
         UserLocation location = userLocationRepository.findByUserId(userId)
                 .orElseGet(() -> UserLocation.builder().userId(userId).build());

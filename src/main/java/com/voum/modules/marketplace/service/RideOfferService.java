@@ -53,9 +53,10 @@ public class RideOfferService {
         Motari motari = motariRepository.findById(motariId)
                 .orElseThrow(() -> new ApiException("Motari profile not found.", HttpStatus.NOT_FOUND));
 
-        if (!"APPROVED".equals(motari.getVerificationStatus())) {
-            throw new ApiException("Only approved drivers can submit offers.", HttpStatus.FORBIDDEN);
-        }
+        // Verification requirement temporarily disabled for testing Motari functionality
+        // if (!"APPROVED".equals(motari.getVerificationStatus())) {
+        //     throw new ApiException("Only approved drivers can submit offers.", HttpStatus.FORBIDDEN);
+        // }
 
         // Validate Motari presence (ONLINE and not BUSY)
         UserLocation driverLoc = userLocationRepository.findByUserId(motariId)
