@@ -39,6 +39,23 @@ public class RideRequestController {
         return ResponseEntity.ok(ApiResponse.success(requests, "Passenger ride requests retrieved."));
     }
 
+    @GetMapping("/active")
+    @PreAuthorize("hasRole('PASSENGER')")
+    public ResponseEntity<ApiResponse<RideRequestResponse>> getActiveRequest(
+            @AuthenticationPrincipal UUID passengerId) {
+        RideRequestResponse active = rideRequestService.getActiveRequest(passengerId);
+        return ResponseEntity.ok(ApiResponse.success(active, "Active ride request retrieved."));
+    }
+
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasRole('PASSENGER')")
+    public ResponseEntity<ApiResponse<Void>> cancelRequest(
+            @AuthenticationPrincipal UUID passengerId,
+            @PathVariable("id") UUID id) {
+        rideRequestService.cancelRequest(id, passengerId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Ride request cancelled successfully."));
+    }
+
     @GetMapping("/nearby")
     @PreAuthorize("hasRole('MOTARI')")
     public ResponseEntity<ApiResponse<List<RideRequestResponse>>> getNearbyRequests(

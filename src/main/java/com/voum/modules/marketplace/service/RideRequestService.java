@@ -52,12 +52,19 @@ public class RideRequestService {
         }
 
         // Rule: One ACTIVE request per passenger at a time
-        boolean hasActiveRequest = rideRequestRepository.existsByPassengerIdAndStatus(passengerId, "OPEN");
-        if (hasActiveRequest) {
-            throw new ApiException("You already have an active open ride request. Please cancel or wait for it to expire.", HttpStatus.BAD_REQUEST);
+        Instant now = Instant.now();
+        List<RideRequest> existingRequests = rideRequestRepository.findByPassengerIdOrderByCreatedAtDesc(passengerId);
+        for (RideRequest reqItem : existingRequests) {
+            if ("OPEN".equals(reqItem.getStatus())) {
+                if (reqItem.getExpiresAt() != null && reqItem.getExpiresAt().isBefore(now)) {
+                    reqItem.setStatus("EXPIRED");
+                    rideRequestRepository.save(reqItem);
+                } else {
+                    throw new ApiException("You already have an active open ride request. Please cancel or wait for it to expire.", HttpStatus.BAD_REQUEST);
+                }
+            }
         }
 
-        Instant now = Instant.now();
         Instant expiresAt = now.plus(Duration.ofMinutes(5)); // 5 minutes visibility window for testing
 
         RideRequest request = RideRequest.builder()
@@ -85,6 +92,32 @@ public class RideRequestService {
         eventPublisher.publishEvent(new RideRequestCreatedEvent(this, request));
 
         return marketplaceMapper.toRequestResponse(request);
+    }
+
+    @Transactional(readOnly = true)
+    public RideRequestResponse getActiveRequest(UUID passengerId) {
+        Instant now = Instant.now();
+        List<RideRequest> requests = rideRequestRepository.findByPassengerIdOrderByCreatedAtDesc(passengerId);
+        for (RideRequest req : requests) {
+            if ("OPEN".equals(req.getStatus()) && req.getExpiresAt() != null && req.getExpiresAt().isAfter(now)) {
+                return marketplaceMapper.toRequestResponse(req);
+            }
+        }
+        return null;
+    }
+
+    @Transactional
+    public void cancelRequest(UUID id, UUID passengerId) {
+        RideRequest request = rideRequestRepository.findById(id)
+                .orElseThrow(() -> new ApiException("Ride request not found.", HttpStatus.NOT_FOUND));
+
+        if (!request.getPassengerId().equals(passengerId)) {
+            throw new ApiException("You are not authorized to cancel this request.", HttpStatus.FORBIDDEN);
+        }
+
+        request.setStatus("CANCELLED");
+        rideRequestRepository.save(request);
+        log.info("Ride request {} cancelled by passenger {}", id, passengerId);
     }
 
 
