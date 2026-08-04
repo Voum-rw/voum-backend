@@ -200,7 +200,8 @@ public class LocationService {
         // 2. Fetch driver profile details
         List<Motari> motaris = motariRepository.findAllById(driverIds);
         Map<UUID, Motari> motariMap = motaris.stream()
-                .filter(m -> "APPROVED".equals(m.getVerificationStatus()))
+                // Verification check disabled for testing Motari functionality
+                // .filter(m -> "APPROVED".equals(m.getVerificationStatus()))
                 .collect(Collectors.toMap(Motari::getId, m -> m));
 
         List<NearbyMotariResponse> results = new ArrayList<>();

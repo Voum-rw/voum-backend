@@ -58,7 +58,7 @@ public class RideRequestService {
         }
 
         Instant now = Instant.now();
-        Instant expiresAt = now.plus(Duration.ofSeconds(60)); // Default 60 seconds visibility window
+        Instant expiresAt = now.plus(Duration.ofMinutes(5)); // 5 minutes visibility window for testing
 
         RideRequest request = RideRequest.builder()
                 .passengerId(passengerId)
