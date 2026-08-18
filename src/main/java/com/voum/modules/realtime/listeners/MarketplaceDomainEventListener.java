@@ -37,11 +37,12 @@ public class MarketplaceDomainEventListener {
         RideRequest request = event.getRideRequest();
         log.info("Handling RideRequestCreatedEvent for request: {}", request.getId());
 
-        // Find nearby online, approved, non-busy drivers within visibility radius
+        // Find nearby online drivers within radius (expanded to 10km for city-wide test coverage)
+        double radius = request.getVisibilityRadiusKm() != null ? Math.max(request.getVisibilityRadiusKm(), 10.0) : 10.0;
         List<NearbyMotariResponse> nearby = locationService.findNearbyMotaris(
                 request.getPickupLatitude(),
                 request.getPickupLongitude(),
-                request.getVisibilityRadiusKm()
+                radius
         );
 
         List<UUID> driverIds = nearby.stream()

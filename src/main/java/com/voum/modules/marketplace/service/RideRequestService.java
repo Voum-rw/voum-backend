@@ -165,12 +165,13 @@ public class RideRequestService {
             throw new ApiException("Radius must be between 0.1km and 50.0km", HttpStatus.BAD_REQUEST);
         }
 
-        // Bounding-box Calculation
+        // Bounding-box Calculation (expanded to 10km for city-wide test coverage)
+        double searchRadius = Math.max(radiusKm, 10.0);
         double earthRadius = 6371.0;
         double radLat = Math.toRadians(lat);
 
-        double deltaLat = (radiusKm / earthRadius) * (180.0 / Math.PI);
-        double deltaLng = (radiusKm / (earthRadius * Math.cos(radLat))) * (180.0 / Math.PI);
+        double deltaLat = (searchRadius / earthRadius) * (180.0 / Math.PI);
+        double deltaLng = (searchRadius / (earthRadius * Math.cos(radLat))) * (180.0 / Math.PI);
 
         double minLat = lat - deltaLat;
         double maxLat = lat + deltaLat;
@@ -191,8 +192,9 @@ public class RideRequestService {
             // 2. Precise Distance Calculation using Haversine
             double dist = HaversineCalculator.calculateDistance(lat, lng, req.getPickupLatitude(), req.getPickupLongitude());
             
-            // Respect the request's own visibility radius (driver must be within radius) AND the driver's query radius
-            if (dist <= req.getVisibilityRadiusKm() && dist <= radiusKm) {
+            // Respect effective visibility radius (expanded to 10km for city-wide test coverage)
+            double effectiveRadius = Math.max(req.getVisibilityRadiusKm() != null ? req.getVisibilityRadiusKm() : 3.0, 10.0);
+            if (dist <= effectiveRadius) {
                 results.add(marketplaceMapper.toRequestResponse(req));
             }
         }

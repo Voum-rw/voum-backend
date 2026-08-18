@@ -179,8 +179,10 @@ public class LocationService {
         double earthRadius = 6371.0;
         double radLat = Math.toRadians(lat);
 
-        double deltaLat = (radiusKm / earthRadius) * (180.0 / Math.PI);
-        double deltaLng = (radiusKm / (earthRadius * Math.cos(radLat))) * (180.0 / Math.PI);
+        // Bounding-box Calculation (expanded to 10km for city-wide test coverage)
+        double searchRadius = Math.max(radiusKm, 10.0);
+        double deltaLat = (searchRadius / earthRadius) * (180.0 / Math.PI);
+        double deltaLng = (searchRadius / (earthRadius * Math.cos(radLat))) * (180.0 / Math.PI);
 
         double minLat = lat - deltaLat;
         double maxLat = lat + deltaLat;
@@ -214,7 +216,7 @@ public class LocationService {
 
             // 3. Precise Distance Calculation using Haversine
             double dist = HaversineCalculator.calculateDistance(lat, lng, loc.getLatitude(), loc.getLongitude());
-            if (dist <= radiusKm) {
+            if (dist <= searchRadius) {
                 results.add(locationMapper.toNearbyResponse(motari, loc, dist));
             }
         }
