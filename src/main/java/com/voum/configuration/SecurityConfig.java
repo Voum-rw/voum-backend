@@ -41,6 +41,7 @@ public class SecurityConfig {
                     "/actuator/**",
                     "/api/v1/auth/**",
                     "/api/v1/storage/files/**",
+                    "/api/v1/payments/momo/**",
                     "/ws/**"
                 ).permitAll()
                 .anyRequest().authenticated()

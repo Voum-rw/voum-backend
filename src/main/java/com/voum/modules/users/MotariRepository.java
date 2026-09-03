@@ -8,6 +8,7 @@ import java.util.UUID;
 
 @Repository
 public interface MotariRepository extends JpaRepository<Motari, UUID> {
+    Optional<Motari> findByPhoneNumber(String phoneNumber);
     Optional<Motari> findByMotoPlateNumber(String motoPlateNumber);
     Optional<Motari> findByNationalId(String nationalId);
     boolean existsByMotoPlateNumber(String motoPlateNumber);
