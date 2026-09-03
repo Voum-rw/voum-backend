@@ -63,3 +63,11 @@ management:
     export:
       prometheus:
         enabled: true
+
+app:
+  security:
+    jwt:
+      # Access token valid for 60 minutes (was 15 — caused mid-session 403s)
+      access-expiration-minutes: 60
+      # Refresh token valid for 30 days
+      refresh-expiration-days: 30
