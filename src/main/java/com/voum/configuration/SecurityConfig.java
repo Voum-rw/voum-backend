@@ -40,6 +40,7 @@ public class SecurityConfig {
                     "/swagger-ui.html",
                     "/actuator/**",
                     "/api/v1/auth/**",
+                    "/api/v1/location/places/**",
                     "/api/v1/storage/files/**",
                     "/api/v1/payments/momo/**",
                     "/ws/**"

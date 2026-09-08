@@ -3,6 +3,7 @@ package com.voum.modules.location.controller;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
@@ -11,12 +12,13 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.util.*;
 
 /**
- * Geocoding controller using Nominatim (OpenStreetMap) — 100% free, no API key required.
+ * Places controller supporting Google Maps Geocoding API with automatic fallback
+ * to OpenStreetMap / Nominatim.
  *
  * Endpoints:
  *  GET /api/v1/location/places/autocomplete?input=Kigali&lat=-1.9441&lon=30.0619
  *  GET /api/v1/location/places/reverse-geocode?lat=-1.9441&lon=30.0619
- *  GET /api/v1/location/places/details?place_id=<osm_place_id>
+ *  GET /api/v1/location/places/details?place_id=<place_id>
  */
 @RestController
 @RequestMapping("/api/v1/location/places")
@@ -27,12 +29,13 @@ public class NominatimPlacesController {
     private static final String NOMINATIM_BASE = "https://nominatim.openstreetmap.org";
     private static final String USER_AGENT = "VoumApp/1.0 (voum.rw contact@voum.rw)";
 
+    @Value("${google.maps.api-key:}")
+    private String googleApiKey;
+
     private final RestTemplate restTemplate = new RestTemplate();
 
     /**
      * Autocomplete/search for a place by text query.
-     * Returns a list of predictions in a Google-Maps-compatible shape so the Flutter
-     * PlacesService parses it without changes on the client side.
      */
     @GetMapping("/autocomplete")
     public ResponseEntity<Map<String, Object>> autocomplete(
@@ -45,6 +48,36 @@ public class NominatimPlacesController {
             return ResponseEntity.ok(Map.of("predictions", List.of()));
         }
 
+        // 1. If Google API key is configured, query Google Places Autocomplete first
+        if (googleApiKey != null && !googleApiKey.trim().isEmpty()) {
+            try {
+                UriComponentsBuilder gBuilder = UriComponentsBuilder.fromHttpUrl("https://maps.googleapis.com/maps/api/place/autocomplete/json")
+                        .queryParam("input", input.trim())
+                        .queryParam("key", googleApiKey.trim())
+                        .queryParam("language", "en")
+                        .queryParam("components", "country:rw");
+
+                if (lat != null && lon != null) {
+                    gBuilder.queryParam("location", lat + "," + lon);
+                    gBuilder.queryParam("radius", "50000");
+                } else if (location != null && !location.isEmpty()) {
+                    gBuilder.queryParam("location", location);
+                    gBuilder.queryParam("radius", "50000");
+                }
+
+                Map resp = restTemplate.getForObject(gBuilder.toUriString(), Map.class);
+                if (resp != null && resp.containsKey("predictions")) {
+                    List preds = (List) resp.get("predictions");
+                    if (!preds.isEmpty()) {
+                        return ResponseEntity.ok(Map.of("predictions", preds));
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Google autocomplete failed, falling back to Nominatim: {}", e.getMessage());
+            }
+        }
+
+        // 2. OpenStreetMap / Nominatim fallback
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(NOMINATIM_BASE + "/search")
                 .queryParam("q", input.trim())
                 .queryParam("format", "jsonv2")
@@ -115,14 +148,13 @@ public class NominatimPlacesController {
     }
 
     /**
-     * Returns lat/lng for a place given its Nominatim place_id.
-     * Returns in Google-Maps-compatible format: result.geometry.location.lat/lng
+     * Returns lat/lng for a place given its place_id.
      */
     @GetMapping("/details")
     public ResponseEntity<Map<String, Object>> details(
             @RequestParam("place_id") String placeId) {
 
-        // If the client embedded coordinates in place_id as "lat,lon" (used as fallback)
+        // If coordinates were embedded in place_id (e.g. "lat,lon")
         if (placeId.contains(",")) {
             String[] parts = placeId.split(",");
             try {
@@ -132,6 +164,25 @@ public class NominatimPlacesController {
             } catch (NumberFormatException ignored) {}
         }
 
+        // 1. If Google API key is configured, check Google Place Details
+        if (googleApiKey != null && !googleApiKey.trim().isEmpty() && !placeId.chars().allMatch(Character::isDigit)) {
+            try {
+                String gUrl = UriComponentsBuilder.fromHttpUrl("https://maps.googleapis.com/maps/api/place/details/json")
+                        .queryParam("place_id", placeId)
+                        .queryParam("fields", "geometry")
+                        .queryParam("key", googleApiKey.trim())
+                        .toUriString();
+
+                Map resp = restTemplate.getForObject(gUrl, Map.class);
+                if (resp != null && resp.containsKey("result")) {
+                    return ResponseEntity.ok((Map<String, Object>) resp);
+                }
+            } catch (Exception e) {
+                log.warn("Google place details error: {}", e.getMessage());
+            }
+        }
+
+        // 2. OpenStreetMap / Nominatim fallback
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(NOMINATIM_BASE + "/lookup")
                 .queryParam("osm_ids", "N" + placeId + ",W" + placeId + ",R" + placeId)
                 .queryParam("format", "jsonv2")
@@ -158,7 +209,7 @@ public class NominatimPlacesController {
 
     /**
      * Reverse geocode: convert lat/lng coordinates to a human-readable address.
-     * Returns in Google-Maps-compatible format (results[0].formatted_address).
+     * Uses Google Geocoding API if key is present, otherwise falls back to Nominatim.
      */
     @GetMapping("/reverse-geocode")
     public ResponseEntity<Map<String, Object>> reverseGeocode(
@@ -184,12 +235,35 @@ public class NominatimPlacesController {
             return ResponseEntity.ok(Map.of("results", List.of()));
         }
 
+        // 1. Google Maps Geocoding API (Option B)
+        if (googleApiKey != null && !googleApiKey.trim().isEmpty()) {
+            try {
+                String googleUrl = UriComponentsBuilder.fromHttpUrl("https://maps.googleapis.com/maps/api/geocode/json")
+                        .queryParam("latlng", resolvedLat + "," + resolvedLon)
+                        .queryParam("key", googleApiKey.trim())
+                        .queryParam("language", "en")
+                        .toUriString();
+
+                Map resp = restTemplate.getForObject(googleUrl, Map.class);
+                if (resp != null && "OK".equals(resp.get("status")) && resp.containsKey("results")) {
+                    List results = (List) resp.get("results");
+                    if (!results.isEmpty()) {
+                        log.info("Google Geocoding succeeded for {},{}", resolvedLat, resolvedLon);
+                        return ResponseEntity.ok(Map.of("results", results));
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Google Geocoding API call failed, using Nominatim fallback: {}", e.getMessage());
+            }
+        }
+
+        // 2. Nominatim fallback
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(NOMINATIM_BASE + "/reverse")
                 .queryParam("lat", resolvedLat)
                 .queryParam("lon", resolvedLon)
                 .queryParam("format", "jsonv2")
                 .queryParam("addressdetails", 1)
-                .queryParam("zoom", 16)
+                .queryParam("zoom", 18)
                 .queryParam("accept-language", "en");
 
         HttpHeaders headers = new HttpHeaders();
@@ -225,13 +299,11 @@ public class NominatimPlacesController {
     // ──────────────────────────── helpers ────────────────────────────
 
     private String buildMainText(Map<String, Object> address, String displayName) {
-        // Prefer specific named place, then road, then suburb
         for (String key : new String[]{"amenity", "tourism", "shop", "road", "pedestrian", "path", "suburb", "neighbourhood"}) {
             if (address.containsKey(key) && address.get(key) != null) {
                 return String.valueOf(address.get(key));
             }
         }
-        // Fall back to first part of display name
         String[] parts = displayName.split(",");
         return parts.length > 0 ? parts[0].trim() : displayName;
     }
@@ -245,7 +317,6 @@ public class NominatimPlacesController {
             }
         }
         if (!parts.isEmpty()) return String.join(", ", parts);
-        // Strip main text from display name and return the rest
         if (displayName.startsWith(mainText)) {
             String rest = displayName.substring(mainText.length()).replaceFirst("^,\\s*", "");
             return rest.isEmpty() ? "Rwanda" : rest;
@@ -253,10 +324,6 @@ public class NominatimPlacesController {
         return "Rwanda";
     }
 
-    /**
-     * Build a clean, human-readable address from Nominatim address components.
-     * Priority: road + house_number → suburb/neighbourhood → city → district
-     */
     private String buildReverseAddress(Map<String, Object> address, String displayName) {
         List<String> parts = new ArrayList<>();
 
@@ -264,7 +331,6 @@ public class NominatimPlacesController {
         String houseNumber = getAddressField(address, "house_number");
         String suburb = getAddressField(address, "suburb", "neighbourhood", "quarter", "city_district");
         String city = getAddressField(address, "city", "town", "village", "municipality");
-        String country = getAddressField(address, "country");
 
         if (road != null) {
             if (houseNumber != null) {
@@ -277,7 +343,6 @@ public class NominatimPlacesController {
         if (city != null && !city.equals(suburb)) parts.add(city);
 
         if (parts.isEmpty()) {
-            // Last resort: use the first meaningful segment of display_name
             String[] segments = displayName.split(",");
             for (String seg : segments) {
                 seg = seg.trim();

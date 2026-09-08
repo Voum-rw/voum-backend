@@ -71,3 +71,8 @@ app:
       access-expiration-minutes: 60
       # Refresh token valid for 30 days
       refresh-expiration-days: 30
+
+google:
+  maps:
+    api-key: ${GOOGLE_MAPS_API_KEY:}
+

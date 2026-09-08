@@ -11,3 +11,7 @@ server:
     include-binding-errors: always
 
 debug: true
+
+google:
+  maps:
+    api-key: ${GOOGLE_MAPS_API_KEY:}
