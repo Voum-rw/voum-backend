@@ -46,4 +46,8 @@ public class TripResponse {
     private Instant completedAt;
     private Instant cancelledAt;
     private Instant updatedAt;
+    
+    private String passengerPhone;
+    private String motariPhone;
+    private String plateNumber;
 }

@@ -33,4 +33,5 @@ public class RequestCreatedMessage {
     private Double visibilityRadiusKm;
     private String createdArea;
     private Instant createdAt;
+    private String passengerPhone;
 }

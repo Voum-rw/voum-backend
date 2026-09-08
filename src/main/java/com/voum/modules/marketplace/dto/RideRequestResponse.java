@@ -30,4 +30,5 @@ public class RideRequestResponse {
     private Double visibilityRadiusKm;
     private String createdArea;
     private Instant createdAt;
+    private String passengerPhone;
 }

@@ -14,6 +14,9 @@ import com.voum.modules.trip.mapper.TripMapper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.voum.modules.users.User;
+import com.voum.modules.users.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
@@ -22,7 +25,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Component
-@RequiredArgsConstructor
 public class MarketplaceDomainEventListener {
 
     private static final Logger log = LoggerFactory.getLogger(MarketplaceDomainEventListener.class);
@@ -31,6 +33,27 @@ public class MarketplaceDomainEventListener {
     private final LocationService locationService;
     private final RideRequestRepository rideRequestRepository;
     private final TripMapper tripMapper;
+    private final UserRepository userRepository;
+
+    public MarketplaceDomainEventListener(RedisMessagePublisher redisPublisher,
+                                          LocationService locationService,
+                                          RideRequestRepository rideRequestRepository,
+                                          TripMapper tripMapper) {
+        this(redisPublisher, locationService, rideRequestRepository, tripMapper, null);
+    }
+
+    @Autowired
+    public MarketplaceDomainEventListener(RedisMessagePublisher redisPublisher,
+                                          LocationService locationService,
+                                          RideRequestRepository rideRequestRepository,
+                                          TripMapper tripMapper,
+                                          UserRepository userRepository) {
+        this.redisPublisher = redisPublisher;
+        this.locationService = locationService;
+        this.rideRequestRepository = rideRequestRepository;
+        this.tripMapper = tripMapper;
+        this.userRepository = userRepository;
+    }
 
     @EventListener
     public void handleRequestCreated(RideRequestCreatedEvent event) {
@@ -51,6 +74,13 @@ public class MarketplaceDomainEventListener {
 
         log.info("Found {} nearby drivers for request {}", driverIds.size(), request.getId());
 
+        String passengerPhone = null;
+        if (userRepository != null && request.getPassengerId() != null) {
+            passengerPhone = userRepository.findById(request.getPassengerId())
+                    .map(User::getPhone)
+                    .orElse(null);
+        }
+
         RequestCreatedMessage payload = RequestCreatedMessage.builder()
                 .eventType("REQUEST_CREATED")
                 .id(request.getId())
@@ -69,6 +99,7 @@ public class MarketplaceDomainEventListener {
                 .visibilityRadiusKm(request.getVisibilityRadiusKm())
                 .createdArea(request.getCreatedArea())
                 .createdAt(request.getCreatedAt())
+                .passengerPhone(passengerPhone)
                 .build();
 
         // Publish to Redis channel to broadcast to the targeted nearby drivers

@@ -64,7 +64,7 @@ class RideRequestServiceTest {
                 .build();
 
         when(passengerRepository.existsById(passengerId)).thenReturn(true);
-        when(rideRequestRepository.existsByPassengerIdAndStatus(passengerId, "OPEN")).thenReturn(false);
+        when(rideRequestRepository.findByPassengerIdOrderByCreatedAtDesc(passengerId)).thenReturn(java.util.Collections.emptyList());
         when(rideRequestRepository.save(any(RideRequest.class))).thenAnswer(invocation -> {
             RideRequest saved = invocation.getArgument(0);
             saved.setId(UUID.randomUUID());
@@ -94,7 +94,9 @@ class RideRequestServiceTest {
 
         when(passengerRepository.existsById(passengerId)).thenReturn(true);
         // Passenger already has an active request
-        when(rideRequestRepository.existsByPassengerIdAndStatus(passengerId, "OPEN")).thenReturn(true);
+        when(rideRequestRepository.findByPassengerIdOrderByCreatedAtDesc(passengerId)).thenReturn(
+                List.of(RideRequest.builder().status("OPEN").expiresAt(Instant.now().plusSeconds(300)).build())
+        );
 
         ApiException exception = assertThrows(ApiException.class, () ->
                 rideRequestService.createRequest(passengerId, req));
