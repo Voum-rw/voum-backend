@@ -142,8 +142,8 @@ public class ReviewService {
                 .orElseThrow(() -> new ApiException("Motari profile not found.", HttpStatus.NOT_FOUND));
 
         return MotariRatingResponse.builder()
-                .averageRating(motari.getAverageRating())
-                .totalReviews(motari.getTotalReviews())
+                .averageRating(tripReviewRepository.getAverageRatingForUser(motariId))
+                .totalReviews(tripReviewRepository.countReviewsForUser(motariId))
                 .completionRate(motari.getCompletionRate())
                 .trustScore(motari.getTrustScore())
                 .build();

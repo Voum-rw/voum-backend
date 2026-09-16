@@ -230,7 +230,7 @@ public class TripServiceTest {
     }
 
     @Test
-    public void testCompleteTrip_byDriver_shouldTransitionToCompletedAndResetDriver() {
+    public void testCompleteTrip_requiresOtherParticipantConfirmation() {
         UUID tripId = UUID.randomUUID();
         UUID driverId = UUID.randomUUID();
         UUID passengerId = UUID.randomUUID();
@@ -248,9 +248,15 @@ public class TripServiceTest {
         TripResponse response = tripService.completeTrip(tripId, driverId);
 
         assertNotNull(response);
-        assertEquals("COMPLETED", response.getStatus());
-        assertNotNull(response.getCompletedAt());
-        verify(locationService, times(1)).updateAvailabilityStatus(driverId, "ONLINE");
+        assertEquals("COMPLETION_REQUESTED", response.getStatus());
+        assertEquals(driverId, response.getCompletionRequestedBy());
+        assertNull(response.getCompletedAt());
+        verifyNoInteractions(locationService);
+        assertThrows(ApiException.class, () -> tripService.confirmCompletion(tripId, driverId));
+        TripResponse completed = tripService.confirmCompletion(tripId, passengerId);
+        assertEquals("COMPLETED", completed.getStatus());
+        assertNotNull(completed.getCompletedAt());
+        verify(locationService, times(1)).updateAvailabilityStatus(driverId, "OFFLINE");
         verify(eventPublisher, times(1)).publishEvent(any(TripCompletedEvent.class));
     }
 
@@ -278,12 +284,12 @@ public class TripServiceTest {
         assertEquals(passengerId, response.getCancelledBy());
         assertNotNull(response.getCancelledAt());
         
-        verify(locationService, times(1)).updateAvailabilityStatus(driverId, "ONLINE");
+        verify(locationService, times(1)).updateAvailabilityStatus(driverId, "OFFLINE");
         verify(eventPublisher, times(1)).publishEvent(any(TripCancelledEvent.class));
     }
 
     @Test
-    public void testCancelTrip_whenInProgress_shouldThrowBadRequest() {
+    public void testCancelTrip_whenInProgress_shouldSucceed() {
         UUID tripId = UUID.randomUUID();
         UUID driverId = UUID.randomUUID();
         UUID passengerId = UUID.randomUUID();
@@ -297,14 +303,12 @@ public class TripServiceTest {
 
         when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
 
-        ApiException ex = assertThrows(ApiException.class, () ->
-            tripService.cancelTrip(tripId, passengerId, "Cancel please")
-        );
-        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        when(tripRepository.save(any(Trip.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        assertEquals("CANCELLED", tripService.cancelTrip(tripId, passengerId, "Cancel please").getStatus());
     }
 
     @Test
-    public void testIllegalTransition_shouldThrowBadRequest() {
+    public void testConfirmationWithoutRequest_shouldConflict() {
         UUID tripId = UUID.randomUUID();
         UUID driverId = UUID.randomUUID();
         UUID passengerId = UUID.randomUUID();
@@ -318,10 +322,10 @@ public class TripServiceTest {
 
         when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
 
-        // CREATED -> COMPLETED is illegal
+        // Confirmation requires a recorded request.
         ApiException ex = assertThrows(ApiException.class, () ->
-            tripService.completeTrip(tripId, driverId)
+            tripService.confirmCompletion(tripId, driverId)
         );
-        assertEquals(HttpStatus.BAD_REQUEST, ex.getStatus());
+        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
     }
 }

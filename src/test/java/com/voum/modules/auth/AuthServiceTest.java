@@ -175,4 +175,19 @@ class AuthServiceTest {
         // Verifies reuse detection deletes all sessions for the user
         verify(refreshTokenRepository, times(1)).deleteByUser(user);
     }
+    @Test
+    void login_acceptsEmailIgnoringCaseWithoutPhoneNormalization() {
+        UUID id = UUID.randomUUID();
+        User user = User.builder().id(id).phone("+250780000000").email("owner@example.com")
+                .role(Role.PASSENGER).password("hash").build();
+        when(userRepository.findByEmailIgnoreCase("OWNER@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("secret", "hash")).thenReturn(true);
+        when(tokenProvider.generateAccessToken(id, user.getPhone(), "PASSENGER")).thenReturn("access");
+        when(tokenProvider.generateRefreshToken()).thenReturn("refresh");
+        when(tokenProvider.getRefreshTokenExpiry()).thenReturn(Instant.now().plusSeconds(3600));
+        LoginRequest request = new LoginRequest();
+        request.setPhone("  OWNER@example.com  "); request.setPassword("secret");
+        assertEquals("access", authService.login(request).getAccessToken());
+        verify(userRepository, never()).findByPhone(anyString());
+    }
 }

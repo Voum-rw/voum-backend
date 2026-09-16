@@ -36,12 +36,10 @@ public class RideRequest {
     @Column(name = "pickup_longitude")
     private Double pickupLongitude;
 
-    @NotNull
     @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.DECIMAL)
     @Column(name = "destination_latitude")
     private Double destinationLatitude;
 
-    @NotNull
     @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.DECIMAL)
     @Column(name = "destination_longitude")
     private Double destinationLongitude;

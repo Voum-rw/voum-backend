@@ -290,6 +290,7 @@ public class TripTrackingService {
             throw new ApiException("ETA calculation is only available for active trips.", HttpStatus.BAD_REQUEST);
         }
 
+        if (targetLat == null || targetLng == null) throw new ApiException("ETA is unavailable for a landmark-only destination.", HttpStatus.BAD_REQUEST);
         double distanceKm = HaversineCalculator.calculateDistance(currentLat, currentLng, targetLat, targetLng);
 
         // Compute ETA
@@ -320,6 +321,7 @@ public class TripTrackingService {
     }
 
     public boolean isNearDestination(Trip trip, double currentLat, double currentLng) {
+        if (trip.getDestinationLatitude() == null || trip.getDestinationLongitude() == null) return false;
         double dist = HaversineCalculator.calculateDistance(currentLat, currentLng, trip.getDestinationLatitude(), trip.getDestinationLongitude());
         return dist < 0.030; // 30 meters
     }

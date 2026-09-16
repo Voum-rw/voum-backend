@@ -55,6 +55,9 @@ public class TripMapper {
 
         return TripResponse.builder()
                 .id(trip.getId())
+                .completionRequestedBy(trip.getCompletionRequestedBy())
+                .passengerName(userRepository == null ? null : userRepository.findById(trip.getPassengerId()).map(User::getName).orElse(null))
+                .motariName(userRepository == null ? null : userRepository.findById(trip.getMotariId()).map(User::getName).orElse(null))
                 .tripNumber(trip.getTripNumber())
                 .rideRequestId(trip.getRideRequestId())
                 .rideOfferId(trip.getRideOfferId())

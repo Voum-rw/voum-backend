@@ -253,30 +253,44 @@ public class TripService {
         return tripMapper.toResponse(trip);
     }
 
+    /** Legacy endpoint now requests completion; it cannot bypass the second participant. */
     @Transactional
-    public TripResponse completeTrip(UUID id, UUID driverId) {
-        log.info("Driver {} completing trip {}", driverId, id);
-        Trip trip = findAndValidateOwnership(id, driverId);
+    public TripResponse completeTrip(UUID id, UUID callerId) {
+        return requestCompletion(id, callerId);
+    }
 
-        if (!trip.getMotariId().equals(driverId)) {
-            throw new ApiException("Access Denied: Only the assigned driver can complete the trip.", HttpStatus.FORBIDDEN);
-        }
-
+    @Transactional
+    public TripResponse requestCompletion(UUID id, UUID callerId) {
+        Trip trip = findAndValidateOwnership(id, callerId);
         String oldStatus = trip.getStatus();
-        validateTransition(oldStatus, "COMPLETED");
-
-        Instant now = Instant.now();
-        trip.setStatus("COMPLETED");
-        trip.setCompletedAt(now);
-        trip.setLastStatusChangeAt(now);
+        if ("COMPLETION_REQUESTED".equals(oldStatus)) return tripMapper.toResponse(trip);
+        if ("COMPLETED".equals(oldStatus) || "CANCELLED".equals(oldStatus)) {
+            throw new ApiException("Trip is already closed.", HttpStatus.CONFLICT);
+        }
+        trip.setStatus("COMPLETION_REQUESTED");
+        trip.setCompletionRequestedBy(callerId);
+        trip.setCompletionRequestedAt(Instant.now());
+        trip.setLastStatusChangeAt(Instant.now());
         trip = tripRepository.save(trip);
+        eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, oldStatus, "COMPLETION_REQUESTED"));
+        return tripMapper.toResponse(trip);
+    }
 
-        // Reset Motari availability status to ONLINE
-        locationService.updateAvailabilityStatus(trip.getMotariId(), "ONLINE");
-
+    @Transactional
+    public TripResponse confirmCompletion(UUID id, UUID callerId) {
+        Trip trip = findAndValidateOwnership(id, callerId);
+        if ("COMPLETED".equals(trip.getStatus())) return tripMapper.toResponse(trip);
+        if (!"COMPLETION_REQUESTED".equals(trip.getStatus())) throw new ApiException("No completion request is pending.", HttpStatus.CONFLICT);
+        if (callerId.equals(trip.getCompletionRequestedBy())) throw new ApiException("The other participant must confirm completion.", HttpStatus.FORBIDDEN);
+        trip.setStatus("COMPLETED");
+        trip.setCompletedAt(Instant.now());
+        trip.setCompletionConfirmedBy(callerId);
+        trip.setLastStatusChangeAt(Instant.now());
+        trip = tripRepository.save(trip);
+        // Return offline; another explicit online action must satisfy current location/eligibility.
+        locationService.updateAvailabilityStatus(trip.getMotariId(), "OFFLINE");
         eventPublisher.publishEvent(new TripCompletedEvent(this, trip));
-        eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, oldStatus, "COMPLETED"));
-
+        eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, "COMPLETION_REQUESTED", "COMPLETED"));
         return tripMapper.toResponse(trip);
     }
 
@@ -297,7 +311,7 @@ public class TripService {
         trip = tripRepository.save(trip);
 
         // Reset Motari availability status to ONLINE
-        locationService.updateAvailabilityStatus(trip.getMotariId(), "ONLINE");
+        locationService.updateAvailabilityStatus(trip.getMotariId(), "OFFLINE");
 
         eventPublisher.publishEvent(new TripCancelledEvent(this, trip));
         eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, oldStatus, "CANCELLED"));
@@ -348,10 +362,7 @@ public class TripService {
                 }
                 break;
             case "CANCELLED":
-                // Cancellation allowed from CREATED, MOTARI_EN_ROUTE, or MOTARI_ARRIVED
-                if (!"CREATED".equals(currentStatus) && !"MOTARI_EN_ROUTE".equals(currentStatus) && !"MOTARI_ARRIVED".equals(currentStatus)) {
-                    throw new ApiException("Cancellation not allowed in state: " + currentStatus, HttpStatus.BAD_REQUEST);
-                }
+                // Either participant may cancel any nonterminal trip.
                 break;
             default:
                 throw new ApiException("Unknown trip status: " + targetStatus, HttpStatus.BAD_REQUEST);

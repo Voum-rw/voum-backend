@@ -22,6 +22,15 @@ public class Trip {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @Version
+    private Long version;
+    @Column(name = "completion_requested_by")
+    private UUID completionRequestedBy;
+    @Column(name = "completion_requested_at")
+    private Instant completionRequestedAt;
+    @Column(name = "completion_confirmed_by")
+    private UUID completionConfirmedBy;
+
     @Column(name = "trip_number", insertable = false, updatable = false)
     private Long tripNumber; // DB BIGSERIAL unique number
 
@@ -52,12 +61,10 @@ public class Trip {
     @Column(name = "pickup_address")
     private String pickupAddress;
 
-    @NotNull
-    @Column(name = "destination_latitude", nullable = false)
+    @Column(name = "destination_latitude")
     private Double destinationLatitude;
 
-    @NotNull
-    @Column(name = "destination_longitude", nullable = false)
+    @Column(name = "destination_longitude")
     private Double destinationLongitude;
 
     @Column(name = "destination_address")

@@ -19,6 +19,11 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    @ExceptionHandler(org.springframework.orm.ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ApiResponse<Object>> handleConflict(Exception e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error("Trip changed. Refresh and retry."));
+    }
+
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiResponse<Object>> handleApiException(ApiException e) {
         log.warn("API Exception triggered: {} - Status: {}", e.getMessage(), e.getStatus());

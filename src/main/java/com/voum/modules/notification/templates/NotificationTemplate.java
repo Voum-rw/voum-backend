@@ -28,6 +28,7 @@ public enum NotificationTemplate {
     ),
 
     // ── Trip Lifecycle ────────────────────────────────────────────────────────
+    TRIP_COMPLETION_REQUESTED("Confirm trip completion", "The other participant says the trip is complete. Please confirm in the app."),
     TRIP_CREATED(
             "Trip Created",
             "Your trip has been created. Your Motari is on the way."

@@ -90,10 +90,11 @@ public class PushNotificationService {
     @Transactional
     public void registerDevice(UUID userId, DeviceRegistrationRequest request) {
         Optional<DeviceToken> existing =
-                deviceTokenRepository.findByUserIdAndDeviceToken(userId, request.getDeviceToken());
+                deviceTokenRepository.findByDeviceToken(request.getDeviceToken());
 
         if (existing.isPresent()) {
             DeviceToken token = existing.get();
+            token.setUserId(userId);
             token.setActive(true);
             token.setPlatform(request.getPlatform());
             token.setAppVersion(request.getAppVersion());

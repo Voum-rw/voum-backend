@@ -83,13 +83,19 @@ public class TripController {
         return ResponseEntity.ok(ApiResponse.success(response, "Trip started."));
     }
 
-    @PostMapping("/{id}/complete")
-    @PreAuthorize("hasRole('MOTARI')")
+    @PostMapping({"/{id}/complete", "/{id}/completion-request"})
+    @PreAuthorize("hasAnyRole('PASSENGER', 'MOTARI')")
     public ResponseEntity<ApiResponse<TripResponse>> completeTrip(
             @PathVariable("id") UUID id,
             @AuthenticationPrincipal UUID userId) {
         TripResponse response = tripService.completeTrip(id, userId);
-        return ResponseEntity.ok(ApiResponse.success(response, "Trip completed."));
+        return ResponseEntity.ok(ApiResponse.success(response, "Completion requested."));
+    }
+
+    @PostMapping("/{id}/completion-confirm")
+    @PreAuthorize("hasAnyRole('PASSENGER', 'MOTARI')")
+    public ResponseEntity<ApiResponse<TripResponse>> confirmCompletion(@PathVariable("id") UUID id, @AuthenticationPrincipal UUID userId) {
+        return ResponseEntity.ok(ApiResponse.success(tripService.confirmCompletion(id, userId), "Trip completed."));
     }
 
     @PostMapping("/{id}/cancel")

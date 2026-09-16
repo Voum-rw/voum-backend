@@ -8,8 +8,14 @@ import java.util.UUID;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("SELECT u FROM User u WHERE u.id = :id")
+    Optional<User> findForAccountUpdate(@org.springframework.data.repository.query.Param("id") UUID id);
+
     Optional<User> findByPhone(String phone);
     Optional<User> findByEmail(String email);
+    Optional<User> findByEmailIgnoreCase(String email);
+    boolean existsByEmailIgnoreCase(String email);
     boolean existsByPhone(String phone);
     boolean existsByEmail(String email);
 

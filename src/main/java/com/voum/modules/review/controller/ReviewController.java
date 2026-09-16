@@ -38,8 +38,7 @@ public class ReviewController {
             @AuthenticationPrincipal UUID motariId,
             @Valid @RequestBody ReviewRequest request
     ) {
-        reviewService.submitMotariReview(motariId, request);
-        return ResponseEntity.ok(ApiResponse.success(null, "Review submitted successfully."));
+        throw new com.voum.common.ApiException("Passenger ratings are not supported.", org.springframework.http.HttpStatus.GONE);
     }
 
     @GetMapping("/motaris/{id}/rating")

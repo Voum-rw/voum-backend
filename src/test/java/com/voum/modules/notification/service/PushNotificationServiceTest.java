@@ -62,7 +62,7 @@ class PushNotificationServiceTest {
         request.setPlatform(Platform.ANDROID);
         request.setAppVersion("1.0.0");
 
-        when(deviceTokenRepository.findByUserIdAndDeviceToken(userId, "token-abc-123"))
+        when(deviceTokenRepository.findByDeviceToken("token-abc-123"))
                 .thenReturn(Optional.empty());
 
         service.registerDevice(userId, request);
@@ -91,7 +91,7 @@ class PushNotificationServiceTest {
                 .active(false)
                 .build();
 
-        when(deviceTokenRepository.findByUserIdAndDeviceToken(userId, "existing-token"))
+        when(deviceTokenRepository.findByDeviceToken("existing-token"))
                 .thenReturn(Optional.of(existing));
 
         service.registerDevice(userId, request);
@@ -103,24 +103,16 @@ class PushNotificationServiceTest {
     }
 
     @Test
-    void registerDevice_shouldNotAllowUserToRegisterAnotherUsersToken() {
-        // Two different users try to register the same device token
+    void registeringSameDeviceForNewLoginTransfersOwnership() {
         UUID otherUserId = UUID.randomUUID();
         DeviceRegistrationRequest request = new DeviceRegistrationRequest();
         request.setDeviceToken("shared-token");
         request.setPlatform(Platform.ANDROID);
-
-        // User1 already owns the token
-        when(deviceTokenRepository.findByUserIdAndDeviceToken(userId, "shared-token"))
-                .thenReturn(Optional.empty());
-        when(deviceTokenRepository.findByUserIdAndDeviceToken(otherUserId, "shared-token"))
-                .thenReturn(Optional.empty());
-
-        service.registerDevice(userId, request);
+        DeviceToken existing = DeviceToken.builder().userId(userId).deviceToken("shared-token").active(true).build();
+        when(deviceTokenRepository.findByDeviceToken("shared-token")).thenReturn(Optional.of(existing));
         service.registerDevice(otherUserId, request);
-
-        // Both calls should save — token is stored per (userId, token) pair
-        verify(deviceTokenRepository, times(2)).save(any(DeviceToken.class));
+        assertEquals(otherUserId, existing.getUserId());
+        verify(deviceTokenRepository).save(existing);
     }
 
     // ── Notification Dispatch Tests ──────────────────────────────────────────

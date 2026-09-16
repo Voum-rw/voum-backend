@@ -11,6 +11,9 @@ public class RegisterRequest {
     @NotBlank(message = "Full name is required")
     private String fullName;
 
+    @jakarta.validation.constraints.Email
+    private String email;
+
     @NotBlank(message = "Phone number is required")
     @Pattern(regexp = "^(\\+?250|0)?7[2389]\\d{7}$", message = "Invalid Rwandan phone number")
     private String phone;

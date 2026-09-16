@@ -11,7 +11,8 @@ import com.voum.modules.support.events.*;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
+import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
@@ -29,6 +30,10 @@ import java.util.UUID;
 public class PushNotificationEventListener {
 
     private final PushNotificationService pushNotificationService;
+    private final com.voum.modules.location.service.LocationService locations;
+    private final com.voum.modules.users.UserRepository users;
+    private final com.voum.modules.users.MotariRepository motaris;
+    private final com.voum.modules.subscription.repository.MotariSubscriptionRepository subscriptions;
 
     // ── Marketplace Events ────────────────────────────────────────────────────
 
@@ -36,23 +41,34 @@ public class PushNotificationEventListener {
      * Passenger created a ride request → notify nearby Motaris.
      * Note: Since we don't know nearby Motaris at event time (they're selected
      * by geo-query in the marketplace), we skip proactive notification here.
-     * Motaris receive the request via WebSocket. This is a no-op for now.
+     * Foreground WebSocket delivery remains independent.
      */
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onRideRequestCreated(RideRequestCreatedEvent event) {
-        // Motaris are notified via WebSocket broadcast (marketplace engine).
-        // Push notification to nearby Motaris requires the list of Motari IDs,
-        // which is not available in this event. Left for future Sprint when
-        // targeted push-to-Motari list is supported.
-        log.debug("RideRequestCreatedEvent received – Motari push via WebSocket only for now.");
+        var request = event.getRideRequest();
+        double radius = request.getVisibilityRadiusKm() == null ? 3.0 : request.getVisibilityRadiusKm();
+        var now = java.time.Instant.now();
+        if (!"OPEN".equals(request.getStatus()) || !request.getExpiresAt().isAfter(now)) return;
+        for (var nearby : locations.findNearbyMotaris(request.getPickupLatitude(), request.getPickupLongitude(), radius)) {
+            if (!"ONLINE".equals(nearby.getAvailabilityStatus()) || nearby.getDistanceKm() > radius) continue;
+            var user = users.findById(nearby.getMotariId()).orElse(null);
+            var motari = motaris.findById(nearby.getMotariId()).orElse(null);
+            if (user == null || motari == null || Boolean.TRUE.equals(user.getIsBlocked()) || !"ACTIVE".equals(motari.getStatus())) continue;
+            if (!("APPROVED".equals(motari.getVerificationStatus()) || "VERIFIED".equals(motari.getVerificationStatus()))) continue;
+            var membership = subscriptions.findTopByMotariIdOrderByExpiryDateDesc(nearby.getMotariId()).orElse(null);
+            if (membership == null || !("ACTIVE".equals(membership.getStatus()) || "EXPIRING_SOON".equals(membership.getStatus()))
+                    || membership.getStartDate().isAfter(now) || !membership.getExpiryDate().isAfter(now)) continue;
+            pushNotificationService.sendPush(nearby.getMotariId(), NotificationTemplate.RIDE_REQUEST_NEARBY,
+                    Map.of("requestId", request.getId().toString()));
+        }
     }
 
     /**
      * A Motari submitted an offer → notify the passenger.
      */
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onRideOfferSubmitted(RideOfferSubmittedEvent event) {
         UUID passengerId = event.getPassengerId();
 
@@ -67,7 +83,7 @@ public class PushNotificationEventListener {
      * Passenger accepted an offer → notify the Motari.
      */
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onRideOfferAccepted(RideOfferAcceptedEvent event) {
         UUID motariUserId = event.getRideOffer().getMotariId(); // Motari ID == User ID
         Map<String, String> data = new HashMap<>();
@@ -81,7 +97,7 @@ public class PushNotificationEventListener {
      * Ride request expired without any driver accepting → notify the passenger.
      */
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onRideRequestExpired(RideRequestExpiredEvent event) {
         UUID passengerId = event.getRideRequest().getPassengerId();
         Map<String, String> data = new HashMap<>();
@@ -90,13 +106,22 @@ public class PushNotificationEventListener {
         pushNotificationService.sendPush(passengerId, NotificationTemplate.RIDE_REQUEST_EXPIRED, data);
     }
 
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onCompletionRequested(TripStatusChangedEvent event) {
+        var trip = event.getTrip();
+        if (!"COMPLETION_REQUESTED".equals(trip.getStatus())) return;
+        UUID recipient = trip.getPassengerId().equals(trip.getCompletionRequestedBy()) ? trip.getMotariId() : trip.getPassengerId();
+        pushNotificationService.sendPush(recipient, NotificationTemplate.TRIP_COMPLETION_REQUESTED, Map.of("tripId", trip.getId().toString()));
+    }
+
     // ── Trip Events ──────────────────────────────────────────────────────────
 
     /**
      * Trip created → notify both passenger and Motari.
      */
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onTripCreated(TripCreatedEvent event) {
         String tripId = event.getTrip().getId().toString();
         Map<String, String> data = new HashMap<>();
@@ -110,7 +135,7 @@ public class PushNotificationEventListener {
      * Motari is en route → notify passenger.
      */
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onMotariEnRoute(MotariEnRouteEvent event) {
         Map<String, String> data = new HashMap<>();
         data.put("tripId", event.getTrip().getId().toString());
@@ -122,7 +147,7 @@ public class PushNotificationEventListener {
      * Motari arrived at pickup → notify passenger.
      */
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onMotariArrived(MotariArrivedEvent event) {
         Map<String, String> data = new HashMap<>();
         data.put("tripId", event.getTrip().getId().toString());
@@ -134,7 +159,7 @@ public class PushNotificationEventListener {
      * Trip started → notify passenger.
      */
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onTripStarted(TripStartedEvent event) {
         Map<String, String> data = new HashMap<>();
         data.put("tripId", event.getTrip().getId().toString());
@@ -146,7 +171,7 @@ public class PushNotificationEventListener {
      * Trip completed → notify both passenger and Motari.
      */
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onTripCompleted(TripCompletedEvent event) {
         String tripId = event.getTrip().getId().toString();
         Map<String, String> data = new HashMap<>();
@@ -160,7 +185,7 @@ public class PushNotificationEventListener {
      * Trip cancelled → notify both passenger and Motari.
      */
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onTripCancelled(TripCancelledEvent event) {
         String tripId = event.getTrip().getId().toString();
         Map<String, String> data = new HashMap<>();
@@ -176,7 +201,7 @@ public class PushNotificationEventListener {
      * Motari account approved → notify the Motari.
      */
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onAccountApproved(AccountApprovedEvent event) {
         pushNotificationService.sendPush(
                 event.getMotariUserId(),
@@ -189,7 +214,7 @@ public class PushNotificationEventListener {
      * Motari account rejected → notify the Motari.
      */
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onAccountRejected(AccountRejectedEvent event) {
         Map<String, String> data = new HashMap<>();
         if (event.getRejectionReason() != null) {
@@ -208,7 +233,7 @@ public class PushNotificationEventListener {
      * Passenger reviewed Motari → notify Motari (new review) and Passenger (confirm).
      */
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onPassengerReviewedMotari(PassengerReviewedMotariEvent event) {
         String tripId = event.getReview().getTripId().toString();
         Map<String, String> data = new HashMap<>();
@@ -226,7 +251,7 @@ public class PushNotificationEventListener {
      * Motari reviewed Passenger → notify Passenger (new review) and Motari (confirm).
      */
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onMotariReviewedPassenger(MotariReviewedPassengerEvent event) {
         String tripId = event.getReview().getTripId().toString();
         Map<String, String> data = new HashMap<>();
@@ -244,7 +269,7 @@ public class PushNotificationEventListener {
      * Trust score updated significantly (>= 1.0) → notify Motari.
      */
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onTrustScoreUpdated(TrustScoreUpdatedEvent event) {
         double diff = Math.abs(event.getNewScore() - event.getOldScore());
         if (diff >= 1.0) {
@@ -257,7 +282,7 @@ public class PushNotificationEventListener {
     // ── Support & Dispute Events ─────────────────────────────────────────────
 
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onSupportTicketCreated(SupportTicketCreatedEvent event) {
         Map<String, String> data = new HashMap<>();
         data.put("ticketId", event.getTicket().getId().toString());
@@ -266,7 +291,7 @@ public class PushNotificationEventListener {
     }
 
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onSupportTicketAssigned(SupportTicketAssignedEvent event) {
         Map<String, String> data = new HashMap<>();
         data.put("ticketId", event.getTicket().getId().toString());
@@ -274,7 +299,7 @@ public class PushNotificationEventListener {
     }
 
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onSupportTicketClosed(SupportTicketClosedEvent event) {
         Map<String, String> data = new HashMap<>();
         data.put("ticketId", event.getTicket().getId().toString());
@@ -282,7 +307,7 @@ public class PushNotificationEventListener {
     }
 
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserReported(UserReportedEvent event) {
         if (event.getReport().getReporterId() != null) {
             Map<String, String> data = new HashMap<>();
@@ -292,7 +317,7 @@ public class PushNotificationEventListener {
     }
 
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onLostItemCreated(LostItemCreatedEvent event) {
         if (event.getLostItem().getReportedBy() != null) {
             Map<String, String> data = new HashMap<>();

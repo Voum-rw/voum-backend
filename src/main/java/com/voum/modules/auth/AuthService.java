@@ -38,11 +38,16 @@ public class AuthService {
             throw new ApiException("This phone number is already registered.", HttpStatus.CONFLICT);
         }
 
+        String email = req.getEmail() == null || req.getEmail().isBlank() ? null : req.getEmail().trim().toLowerCase(java.util.Locale.ROOT);
+        if (email != null && userRepository.existsByEmailIgnoreCase(email)) {
+            throw new ApiException("Email is already registered.", HttpStatus.CONFLICT);
+        }
         String hashedPassword = passwordEncoder.encode(req.getPassword());
 
         User user = User.builder()
                 .name(req.getFullName().trim())
                 .phone(phone)
+                .email(email)
                 .password(hashedPassword)
                 .role(Role.valueOf(role))
                 .isVerified(role.equals("PASSENGER"))   // Passengers auto-verified; Motaris need admin
@@ -86,9 +91,10 @@ public class AuthService {
 
     @Transactional
     public TokenResponse login(LoginRequest req) {
-        String phone = normalizePhone(req.getPhone());
-
-        User user = userRepository.findByPhone(phone)
+        String identifier = req.getPhone().trim();
+        User user = (identifier.contains("@")
+                ? userRepository.findByEmailIgnoreCase(identifier)
+                : userRepository.findByPhone(normalizePhone(identifier)))
                 .orElseThrow(() -> new ApiException(
                         "Account not found. Please sign up first.", HttpStatus.NOT_FOUND));
 

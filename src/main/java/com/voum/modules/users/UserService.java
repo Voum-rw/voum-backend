@@ -78,11 +78,8 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ApiException("User not found.", HttpStatus.NOT_FOUND));
 
-        if (req.getEmail() != null && !req.getEmail().trim().isEmpty() && !req.getEmail().equals(user.getEmail())) {
-            if (userRepository.existsByEmail(req.getEmail())) {
-                throw new ApiException("Email is already registered.", HttpStatus.CONFLICT);
-            }
-            user.setEmail(req.getEmail());
+        if (req.getEmail() != null && !req.getEmail().equalsIgnoreCase(user.getEmail() == null ? "" : user.getEmail())) {
+            throw new ApiException("Email cannot be changed in profile settings.", HttpStatus.BAD_REQUEST);
         }
 
         if (user.getRole() == Role.PASSENGER) {

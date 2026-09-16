@@ -14,6 +14,9 @@ import java.util.UUID;
 @AllArgsConstructor
 public class TripResponse {
     private UUID id;
+    private UUID completionRequestedBy;
+    private String passengerName;
+    private String motariName;
     private Long tripNumber;
     private UUID rideRequestId;
     private UUID rideOfferId;

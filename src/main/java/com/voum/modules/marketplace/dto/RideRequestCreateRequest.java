@@ -25,12 +25,10 @@ public class RideRequestCreateRequest {
     @DecimalMax(value = "180.0", message = "Pickup longitude must be between -180.0 and 180.0")
     private Double pickupLongitude;
 
-    @NotNull(message = "Destination latitude is required")
     @DecimalMin(value = "-90.0", message = "Destination latitude must be between -90.0 and 90.0")
     @DecimalMax(value = "90.0", message = "Destination latitude must be between -90.0 and 90.0")
     private Double destinationLatitude;
 
-    @NotNull(message = "Destination longitude is required")
     @DecimalMin(value = "-180.0", message = "Destination longitude must be between -180.0 and 180.0")
     @DecimalMax(value = "180.0", message = "Destination longitude must be between -180.0 and 180.0")
     private Double destinationLongitude;
@@ -51,4 +49,10 @@ public class RideRequestCreateRequest {
     private Double visibilityRadiusKm = 3.00;
 
     private String createdArea;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @jakarta.validation.constraints.AssertTrue(message = "Destination coordinates must both be supplied or both omitted")
+    public boolean isDestinationCoordinatePairValid() {
+        return (destinationLatitude == null) == (destinationLongitude == null);
+    }
 }
