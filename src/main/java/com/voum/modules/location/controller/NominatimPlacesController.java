@@ -13,6 +13,7 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/v1/location/places")
 public class NominatimPlacesController {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(NominatimPlacesController.class);
     @Value("${google.maps.api-key:}") private String googleApiKey;
     private final RestTemplate client;
     public NominatimPlacesController() {
@@ -28,7 +29,7 @@ public class NominatimPlacesController {
         var query = base("place/autocomplete/json").queryParam("input", input.trim()).queryParam("components", "country:rw");
         if (lat != null && lon != null) {
             validate(lat, lon);
-            query.queryParam("location", lat + "," + lon).queryParam("radius", 5000).queryParam("strictbounds", true);
+            query.queryParam("location", lat + "," + lon).queryParam("radius", 10000);
         }
         return call(query);
     }
@@ -55,8 +56,19 @@ public class NominatimPlacesController {
         Map<String, Object> result;
         try { result = client.getForObject(uri.build().encode().toUri(), Map.class); }
         catch (Exception error) { throw new ApiException("Place search is temporarily unavailable.", HttpStatus.SERVICE_UNAVAILABLE); }
-        if (result == null || !("OK".equals(result.get("status")) || "ZERO_RESULTS".equals(result.get("status"))))
-            throw new ApiException("Place search is temporarily unavailable.", HttpStatus.SERVICE_UNAVAILABLE);
+        if (result == null) throw new ApiException("Google returned no location response.", HttpStatus.SERVICE_UNAVAILABLE);
+        String status = String.valueOf(result.get("status"));
+        if (!("OK".equals(status) || "ZERO_RESULTS".equals(status))) {
+            // Never log the request URL, API key or raw provider error text.
+            String safeStatus = Set.of("REQUEST_DENIED", "OVER_QUERY_LIMIT", "OVER_DAILY_LIMIT", "INVALID_REQUEST", "UNKNOWN_ERROR").contains(status) ? status : "UNEXPECTED_RESPONSE";
+            log.warn("Google location lookup failed: {}", safeStatus);
+            String message = switch (safeStatus) {
+                case "REQUEST_DENIED" -> "Google location access was denied. Check the server key's enabled APIs and restrictions.";
+                case "OVER_QUERY_LIMIT", "OVER_DAILY_LIMIT" -> "Google location quota is unavailable. Check the server project's billing and quota.";
+                default -> "Google location lookup is temporarily unavailable.";
+            };
+            throw new ApiException(message, HttpStatus.SERVICE_UNAVAILABLE);
+        }
         result.put("provider", "GOOGLE");
         return result;
     }
