@@ -12,14 +12,18 @@ import org.springframework.core.io.ClassPathResource;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Configures Firebase Admin SDK.
  * <p>
  * Credential resolution order:
- * 1. FIREBASE_CREDENTIALS environment variable (JSON string) — for production / Render.
- * 2. firebase-service-account.json on the classpath — for local development.
- * 3. If neither is found, application boots in MockProvider mode — no startup crash.
+ * 1. FIREBASE_CREDENTIALS environment variable (JSON string).
+ * 2. Uppercase service-account fields, optionally prefixed with FIREBASE_.
+ * 3. firebase-service-account.json on the classpath for local development.
+ * 4. If none are found, application boots in MockProvider mode.
  */
 @Configuration
 public class FirebaseConfig {
@@ -28,11 +32,10 @@ public class FirebaseConfig {
 
     @Bean
     public NotificationProvider notificationProvider() {
-        try {
-            InputStream credentialStream = resolveCredentials();
+        try (InputStream credentialStream = resolveCredentials()) {
             if (credentialStream == null) {
                 log.warn("[Firebase] No credentials found. Booting in MOCK NOTIFICATION mode. "
-                        + "Set FIREBASE_CREDENTIALS env var or place firebase-service-account.json on classpath.");
+                        + "Configure FIREBASE_CREDENTIALS JSON or the service-account environment fields.");
                 return new MockNotificationProvider();
             }
 
@@ -44,19 +47,19 @@ public class FirebaseConfig {
                 log.info("[Firebase] FirebaseApp initialized successfully.");
             }
 
-            // Register FirebaseApp as a named bean for ConditionalOnBean to detect
             return new FirebaseNotificationProvider();
         } catch (Exception e) {
-            log.warn("[Firebase] Failed to initialise Firebase ({}). Booting in MOCK NOTIFICATION mode.", e.getMessage());
+            // Parser exceptions may contain credential contents: never log their messages.
+            log.warn("[Firebase] Failed to initialise Firebase ({}). Check credential format. Booting in MOCK NOTIFICATION mode.", e.getClass().getSimpleName());
             return new MockNotificationProvider();
         }
     }
 
-    private InputStream resolveCredentials() {
+    private InputStream resolveCredentials() throws Exception {
         // Priority 1: Environment variable
-        String credJson = System.getenv("FIREBASE_CREDENTIALS");
+        String credJson = credentialJson(System.getenv());
         if (credJson != null && !credJson.isBlank()) {
-            log.info("[Firebase] Loading credentials from FIREBASE_CREDENTIALS environment variable.");
+            log.info("[Firebase] Loading service-account credentials from environment variables.");
             return new ByteArrayInputStream(credJson.getBytes(StandardCharsets.UTF_8));
         }
 
@@ -71,5 +74,27 @@ public class FirebaseConfig {
         }
 
         return null;
+    }
+
+    /** Accept whole JSON or uppercase JSON field names, optionally FIREBASE_-prefixed. */
+    static String credentialJson(Map<String, String> environment) throws Exception {
+        String raw = environment.get("FIREBASE_CREDENTIALS");
+        if (raw != null && !raw.isBlank()) return raw;
+        Map<String, String> fields = new LinkedHashMap<>();
+        for (String key : new String[]{"type", "project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url", "universe_domain"}) {
+            String envKey = key.toUpperCase(java.util.Locale.ROOT);
+            String value = environment.get("FIREBASE_" + envKey);
+            if (value == null || value.isBlank()) value = environment.get(envKey);
+            if (value != null && !value.isBlank()) fields.put(key, value);
+        }
+        // Generic environment names must not accidentally select a partial service account.
+        if (!fields.containsKey("private_key") && !fields.containsKey("client_email")) return null;
+        for (String required : new String[]{"project_id", "private_key", "client_email"}) {
+            if (!fields.containsKey(required)) throw new IllegalArgumentException("Incomplete Firebase service-account fields");
+        }
+        fields.putIfAbsent("type", "service_account");
+        fields.putIfAbsent("token_uri", "https://oauth2.googleapis.com/token");
+        fields.put("private_key", fields.get("private_key").replace("\\n", "\n"));
+        return new ObjectMapper().writeValueAsString(fields);
     }
 }
