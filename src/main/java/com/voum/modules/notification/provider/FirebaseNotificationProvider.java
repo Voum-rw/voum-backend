@@ -26,6 +26,7 @@ public class FirebaseNotificationProvider implements NotificationProvider {
     public boolean send(String deviceToken, String title, String body, Map<String, String> data) throws Exception {
         AndroidConfig androidConfig = AndroidConfig.builder()
                 .setPriority(AndroidConfig.Priority.HIGH)
+                .setNotification(AndroidNotification.builder().setChannelId("ride_updates").setIcon("ic_stat_ride").build())
                 .build();
 
         ApnsConfig apnsConfig = ApnsConfig.builder()
@@ -52,7 +53,7 @@ public class FirebaseNotificationProvider implements NotificationProvider {
                     ? e.getMessagingErrorCode().name().toLowerCase().replace("_", "-")
                     : "";
             if (INVALID_TOKEN_CODES.contains(errorCode)) {
-                log.warn("FCM token is invalid/expired: {}", deviceToken);
+                log.warn("FCM rejected an invalid or expired device token.");
                 return false; // Signal invalid token to caller
             }
             // Re-throw transient errors so the retry mechanism handles them

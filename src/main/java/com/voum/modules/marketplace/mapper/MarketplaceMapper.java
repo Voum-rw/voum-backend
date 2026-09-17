@@ -71,6 +71,7 @@ public class MarketplaceMapper {
                 .rideRequestId(offer.getRideRequestId())
                 .motariId(offer.getMotariId())
                 .firstName(firstName)
+                .plateNumber(motari != null ? motari.getMotoPlateNumber() : null)
                 .profileImage(profileImage)
                 .offeredPrice(offer.getOfferedPrice())
                 .estimatedArrivalMinutes(offer.getEstimatedArrivalMinutes())

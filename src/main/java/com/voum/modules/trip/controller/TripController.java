@@ -89,7 +89,7 @@ public class TripController {
             @PathVariable("id") UUID id,
             @AuthenticationPrincipal UUID userId) {
         TripResponse response = tripService.completeTrip(id, userId);
-        return ResponseEntity.ok(ApiResponse.success(response, "Completion requested."));
+        return ResponseEntity.ok(ApiResponse.success(response, "Trip completed."));
     }
 
     @PostMapping("/{id}/completion-confirm")

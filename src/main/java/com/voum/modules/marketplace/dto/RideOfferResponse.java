@@ -16,6 +16,7 @@ public class RideOfferResponse {
     private UUID rideRequestId;
     private UUID motariId;
     private String firstName;
+    private String plateNumber;
     private String profileImage;
     private Double offeredPrice;
     private Integer estimatedArrivalMinutes;

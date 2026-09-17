@@ -230,7 +230,7 @@ public class TripServiceTest {
     }
 
     @Test
-    public void testCompleteTrip_requiresOtherParticipantConfirmation() {
+    public void testCompleteTrip_byMotariCompletesImmediatelyAndRepeatIsIdempotent() {
         UUID tripId = UUID.randomUUID();
         UUID driverId = UUID.randomUUID();
         UUID passengerId = UUID.randomUUID();
@@ -248,14 +248,10 @@ public class TripServiceTest {
         TripResponse response = tripService.completeTrip(tripId, driverId);
 
         assertNotNull(response);
-        assertEquals("COMPLETION_REQUESTED", response.getStatus());
+        assertEquals("COMPLETED", response.getStatus());
         assertEquals(driverId, response.getCompletionRequestedBy());
-        assertNull(response.getCompletedAt());
-        verifyNoInteractions(locationService);
-        assertThrows(ApiException.class, () -> tripService.confirmCompletion(tripId, driverId));
-        TripResponse completed = tripService.confirmCompletion(tripId, passengerId);
-        assertEquals("COMPLETED", completed.getStatus());
-        assertNotNull(completed.getCompletedAt());
+        assertNotNull(response.getCompletedAt());
+        assertEquals("COMPLETED", tripService.completeTrip(tripId, passengerId).getStatus());
         verify(locationService, times(1)).updateAvailabilityStatus(driverId, "OFFLINE");
         verify(eventPublisher, times(1)).publishEvent(any(TripCompletedEvent.class));
     }
@@ -308,7 +304,7 @@ public class TripServiceTest {
     }
 
     @Test
-    public void testConfirmationWithoutRequest_shouldConflict() {
+    public void testCompleteTrip_byPassengerCompletesImmediately() {
         UUID tripId = UUID.randomUUID();
         UUID driverId = UUID.randomUUID();
         UUID passengerId = UUID.randomUUID();
@@ -322,10 +318,8 @@ public class TripServiceTest {
 
         when(tripRepository.findById(tripId)).thenReturn(Optional.of(trip));
 
-        // Confirmation requires a recorded request.
-        ApiException ex = assertThrows(ApiException.class, () ->
-            tripService.confirmCompletion(tripId, driverId)
-        );
-        assertEquals(HttpStatus.CONFLICT, ex.getStatus());
+        when(tripRepository.save(any(Trip.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        assertEquals("COMPLETED", tripService.completeTrip(tripId, passengerId).getStatus());
+        verify(eventPublisher).publishEvent(any(TripCompletedEvent.class));
     }
 }

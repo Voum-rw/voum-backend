@@ -253,46 +253,33 @@ public class TripService {
         return tripMapper.toResponse(trip);
     }
 
-    /** Legacy endpoint now requests completion; it cannot bypass the second participant. */
+    /** Either owning participant may finish the trip. Repeated completion is idempotent. */
     @Transactional
     public TripResponse completeTrip(UUID id, UUID callerId) {
-        return requestCompletion(id, callerId);
-    }
-
-    @Transactional
-    public TripResponse requestCompletion(UUID id, UUID callerId) {
         Trip trip = findAndValidateOwnership(id, callerId);
         String oldStatus = trip.getStatus();
-        if ("COMPLETION_REQUESTED".equals(oldStatus)) return tripMapper.toResponse(trip);
-        if ("COMPLETED".equals(oldStatus) || "CANCELLED".equals(oldStatus)) {
-            throw new ApiException("Trip is already closed.", HttpStatus.CONFLICT);
-        }
-        trip.setStatus("COMPLETION_REQUESTED");
+        if ("COMPLETED".equals(oldStatus)) return tripMapper.toResponse(trip);
+        if ("CANCELLED".equals(oldStatus)) throw new ApiException("Cancelled trips cannot be completed.", HttpStatus.CONFLICT);
+        Instant now = Instant.now();
+        trip.setStatus("COMPLETED");
+        trip.setCompletedAt(now);
         trip.setCompletionRequestedBy(callerId);
-        trip.setCompletionRequestedAt(Instant.now());
-        trip.setLastStatusChangeAt(Instant.now());
+        trip.setCompletionRequestedAt(now);
+        trip.setCompletionConfirmedBy(callerId);
+        trip.setLastStatusChangeAt(now);
         trip = tripRepository.save(trip);
-        eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, oldStatus, "COMPLETION_REQUESTED"));
+        locationService.updateAvailabilityStatus(trip.getMotariId(), "OFFLINE");
+        eventPublisher.publishEvent(new TripCompletedEvent(this, trip));
+        eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, oldStatus, "COMPLETED"));
         return tripMapper.toResponse(trip);
     }
 
+    // Compatibility for installed builds and trips left in the previous pending state.
     @Transactional
-    public TripResponse confirmCompletion(UUID id, UUID callerId) {
-        Trip trip = findAndValidateOwnership(id, callerId);
-        if ("COMPLETED".equals(trip.getStatus())) return tripMapper.toResponse(trip);
-        if (!"COMPLETION_REQUESTED".equals(trip.getStatus())) throw new ApiException("No completion request is pending.", HttpStatus.CONFLICT);
-        if (callerId.equals(trip.getCompletionRequestedBy())) throw new ApiException("The other participant must confirm completion.", HttpStatus.FORBIDDEN);
-        trip.setStatus("COMPLETED");
-        trip.setCompletedAt(Instant.now());
-        trip.setCompletionConfirmedBy(callerId);
-        trip.setLastStatusChangeAt(Instant.now());
-        trip = tripRepository.save(trip);
-        // Return offline; another explicit online action must satisfy current location/eligibility.
-        locationService.updateAvailabilityStatus(trip.getMotariId(), "OFFLINE");
-        eventPublisher.publishEvent(new TripCompletedEvent(this, trip));
-        eventPublisher.publishEvent(new TripStatusChangedEvent(this, trip, "COMPLETION_REQUESTED", "COMPLETED"));
-        return tripMapper.toResponse(trip);
-    }
+    public TripResponse requestCompletion(UUID id, UUID callerId) { return completeTrip(id, callerId); }
+
+    @Transactional
+    public TripResponse confirmCompletion(UUID id, UUID callerId) { return completeTrip(id, callerId); }
 
     @Transactional
     public TripResponse cancelTrip(UUID id, UUID callerId, String reason) {
